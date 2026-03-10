@@ -11,7 +11,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 4; //版本号 FIXME 因为增加了段距和首行缩进的调整功能，所以阅读记录需要清空
+  int get schemaVersion => 4; //版本号
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
