@@ -1,8 +1,23 @@
-# Hikari Novel
+# hikari-novel-sec
 
 基于 Flutter 的轻小说阅读客户端。
 
 这个仓库是我基于原项目继续整理和自用的版本，主要目标还是 Android。当前不提供现成安装包，默认按“自行编译、自行使用”的方式维护。
+
+## 说明与来源
+
+这个项目基于原作者的 [hikari_novel_flutter](https://github.com/15dd/hikari_novel_flutter) 和 [wenku8reader](https://github.com/15dd/wenku8reader) 继续整理而来。
+
+我这边做的主要是：
+
+- 补本地 EPUB 导入与管理
+- 调整书架、标签和筛选
+- 补一些本地阅读相关能力
+- 做适合自己使用的工程整理
+
+这个仓库能继续往前做，离不开原作者前面的工作。无论是整体思路、基础功能，还是很多早期实现，核心来源都在上面两个项目里。
+
+这里单独表示感谢，也建议第一次接触这个项目的人顺手去看看原仓库。
 
 <div align="center">
   <img src="./assets/images/logo_transparent.png" alt="Logo" height="220">
