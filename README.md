@@ -138,6 +138,13 @@ flutter build apk --release
 
 ## 致谢
 
+再次感谢原作者及相关历史贡献者，这个版本是在以下项目基础上继续整理和修改的：
+
+- [hikari_novel_flutter](https://github.com/15dd/hikari_novel_flutter)
+- [wenku8reader](https://github.com/15dd/wenku8reader)
+
+同时也感谢这些项目在交互、结构或实现思路上提供的参考：
+
 - [flutter_dmzj](https://github.com/xiaoyaocz/flutter_dmzj)
 - [venera](https://github.com/venera-app/venera)
 - [mihon](https://github.com/mihonapp/mihon)
