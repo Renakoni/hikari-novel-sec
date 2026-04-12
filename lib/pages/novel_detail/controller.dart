@@ -21,6 +21,7 @@ import '../../models/page_state.dart';
 import '../../models/resource.dart';
 import '../../network/api.dart';
 import '../../service/db_service.dart';
+import '../../service/local_book_service.dart';
 import '../../service/local_storage_service.dart';
 
 class NovelDetailController extends GetxController with GetSingleTickerProviderStateMixin {
@@ -39,6 +40,8 @@ class NovelDetailController extends GetxController with GetSingleTickerProviderS
   RxBool isChapterOrderReversed = false.obs;
 
   RxBool isSelectionMode = false.obs;
+
+  bool get isLocalBook => LocalBookService.isLocalAid(aid);
 
   bool _isFabVisible = true;
   late final AnimationController _fabAnimationCtr;
@@ -214,7 +217,13 @@ class NovelDetailController extends GetxController with GetSingleTickerProviderS
   }
 
   Future<void> getNovelDetail() async {
+    if (isLocalBook) {
+      await _getLocalNovelDetail();
+      return;
+    }
+
     late NovelDetail data;
+    final existingPersonalTags = await _loadExistingPersonalTags();
 
     final nd = await Api.getNovelDetail(aid: aid);
 
@@ -226,6 +235,7 @@ class NovelDetailController extends GetxController with GetSingleTickerProviderS
           case Success():
             {
               data.catalogue.addAll(Parser.getCatalogue(cat.data));
+              data.personalTags.addAll(existingPersonalTags);
               novelDetail.value = data;
 
               DBService.instance.upsertBrowsingHistory(BrowsingHistoryEntityData(aid: aid, title: data.title, img: data.imgUrl, time: DateTime.now()));
@@ -266,8 +276,84 @@ class NovelDetailController extends GetxController with GetSingleTickerProviderS
     }
   }
 
+  Future<void> _getLocalNovelDetail() async {
+    final local = (await DBService.instance.getNovelDetail(aid))?.json;
+    if (local == null) {
+      errorMsg = "本地导入书籍不存在或已损坏";
+      pageState.value = PageState.error;
+      return;
+    }
+
+    novelDetail.value = NovelDetail.fromString(local);
+    await DBService.instance.upsertBrowsingHistory(
+      BrowsingHistoryEntityData(
+        aid: aid,
+        title: novelDetail.value!.title,
+        img: novelDetail.value!.imgUrl,
+        time: DateTime.now(),
+      ),
+    );
+    final bs = await DBService.instance.getAllBookshelf();
+    isInBookshelf.value = bs.any((e) => e.aid == aid);
+    pageState.value = PageState.success;
+  }
+
+  Future<void> _persistLocalNovelDetail() async {
+    final detail = novelDetail.value;
+    if (detail == null) return;
+    await DBService.instance.upsertNovelDetail(NovelDetailEntityData(aid: aid, json: detail.toString()));
+  }
+
+  Future<List<String>> _loadExistingPersonalTags() async {
+    final local = (await DBService.instance.getNovelDetail(aid))?.json;
+    if (local == null) return [];
+    try {
+      return List<String>.from(NovelDetail.fromString(local).personalTags);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> addPersonalTag(String tag) async {
+    final detail = novelDetail.value;
+    if (detail == null) return;
+
+    final normalized = tag.trim();
+    if (normalized.isEmpty) return;
+    if (detail.tags.contains(normalized) || detail.personalTags.contains(normalized)) return;
+
+    detail.personalTags.add(normalized);
+    novelDetail.refresh();
+    await _persistLocalNovelDetail();
+  }
+
+  Future<void> removePersonalTag(String tag) async {
+    final detail = novelDetail.value;
+    if (detail == null) return;
+
+    detail.personalTags.remove(tag);
+    novelDetail.refresh();
+    await _persistLocalNovelDetail();
+  }
+
   bool _isAdding = false; //防抖
   void addToBookshelf() async {
+    if (isLocalBook) {
+      final local = novelDetail.value;
+      if (local == null) return;
+      await DBService.instance.upsertBookshelf(
+        BookshelfEntityData(
+          aid: aid,
+          bid: aid,
+          url: "${LocalBookService.localUrlPrefix}$aid",
+          title: local.title,
+          img: local.imgUrl,
+          classId: "0",
+        ),
+      );
+      isInBookshelf.value = true;
+      return;
+    }
     if (_isAdding) return;
     _isAdding = true;
     final result = await Api.addNovel(aid: aid);
@@ -299,6 +385,11 @@ class NovelDetailController extends GetxController with GetSingleTickerProviderS
 
   bool _isRemoving = false; //防抖
   void removeFromBookshelf() async {
+    if (isLocalBook) {
+      await DBService.instance.deleteBookshelfByAid(aid);
+      isInBookshelf.value = false;
+      return;
+    }
     if (_isRemoving) return;
     _isRemoving = true;
     final bs = await DBService.instance.getAllBookshelf();
@@ -327,6 +418,10 @@ class NovelDetailController extends GetxController with GetSingleTickerProviderS
   }
 
   Future<void> openWithBrowser() async {
+    if (isLocalBook) {
+      showSnackBar(message: "本地导入书籍没有网页详情页", context: Get.context!);
+      return;
+    }
     if (!await launchUrl(Uri.parse("${Api.wenku8Node.node}/book/$aid.htm"))) {
       showSnackBar(message: "unable_to_open_external_browser".tr, context: Get.context!);
     }

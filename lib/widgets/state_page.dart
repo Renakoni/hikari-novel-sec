@@ -140,6 +140,7 @@ void showSnackBar({
 }) {
   // Create a SnackBar widget with specified properties
   var snack = SnackBar(
+    behavior: SnackBarBehavior.floating,
     margin: const EdgeInsets.symmetric(vertical: 20, horizontal: 10), // Set margin around the SnackBar
     duration: duration ?? const Duration(milliseconds: 4000), // Default duration if not provided
     content: Text(

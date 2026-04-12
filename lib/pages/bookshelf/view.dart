@@ -83,6 +83,16 @@ class BookshelfPage extends StatelessWidget {
       ),
       titleSpacing: 0,
       actions: [
+        Obx(
+          () => IconButton(
+            onPressed: () => _showTagFilter(context),
+            icon: Icon(
+              Icons.swap_vert,
+              color: controller.selectedTags.isEmpty ? null : Theme.of(context).colorScheme.primary,
+            ),
+            tooltip: controller.selectedTags.isEmpty ? "Tag Filter" : "Tags: ${controller.selectedTags.join(", ")}",
+          ),
+        ),
         IconButton(
           onPressed: () async {
             showSnackBar(message: "refresh_bookshelf_tip".tr, context: Get.context!);
@@ -93,6 +103,58 @@ class BookshelfPage extends StatelessWidget {
         ),
         IconButton(onPressed: () => controller.pageState.value = PageState.bookshelfSearch, icon: const Icon(Icons.search)),
       ],
+    );
+  }
+
+  Future<void> _showTagFilter(BuildContext context) async {
+    final tags = await controller.getAvailableTagsForClass(currentTabController.classId);
+    if (!context.mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            child: Obx(
+              () => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Tag Filter", style: Theme.of(sheetContext).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text("All"),
+                        selected: controller.selectedTags.isEmpty,
+                        onSelected: (_) => controller.clearTagFilters(),
+                      ),
+                      ...tags.map(
+                        (tag) => ChoiceChip(
+                          label: Text(tag),
+                          selected: controller.selectedTags.contains(tag),
+                          onSelected: (_) => controller.toggleTagFilter(tag),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (tags.isEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      "No cached tags available yet. Open a book detail page first, or import a local EPUB.",
+                      style: Theme.of(sheetContext).textTheme.bodySmall,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

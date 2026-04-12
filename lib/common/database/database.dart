@@ -28,9 +28,13 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> insertAllBookshelf(Iterable<BookshelfEntityData> data) => batch((b) => b.insertAll(bookshelfEntity, data));
 
+  Future<void> upsertBookshelf(BookshelfEntityData data) => into(bookshelfEntity).insertOnConflictUpdate(data);
+
   Future<void> deleteAllBookshelf() => delete(bookshelfEntity).go();
 
   Future<void> deleteDefaultBookshelf() => (delete(bookshelfEntity)..where((i) => i.classId.equals("0"))).go();
+
+  Future<void> deleteBookshelfByAid(String aid) => (delete(bookshelfEntity)..where((i) => i.aid.equals(aid))).go();
 
   Stream<List<BookshelfEntityData>> getBookshelfByClassId(String classId) => (select(bookshelfEntity)..where((i) => i.classId.equals(classId))).watch();
 
@@ -71,6 +75,8 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> deleteReadHistoryByCid(String cid) => (delete(readHistoryEntity)..where((i) => i.cid.equals(cid))).go();
 
+  Future<void> deleteReadHistoryByAid(String aid) => (delete(readHistoryEntity)..where((i) => i.aid.equals(aid))).go();
+
   Future<void> upsertReadHistoryDirectly(ReadHistoryEntityData data) => into(readHistoryEntity).insertOnConflictUpdate(data);
 
   Future<void> deleteAllReadHistory() => delete(readHistoryEntity).go();
@@ -78,6 +84,8 @@ class AppDatabase extends _$AppDatabase {
   Future<void> upsertNovelDetail(NovelDetailEntityData data) => into(novelDetailEntity).insertOnConflictUpdate(data);
 
   Future<NovelDetailEntityData?> getNovelDetail(String aid) => (select(novelDetailEntity)..where((i) => i.aid.equals(aid))).getSingleOrNull();
+
+  Future<void> deleteNovelDetail(String aid) => (delete(novelDetailEntity)..where((i) => i.aid.equals(aid))).go();
 
   Future<void> deleteAllNovelDetail() => delete(novelDetailEntity).go();
 }

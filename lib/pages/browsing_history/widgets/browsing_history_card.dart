@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hikari_novel_flutter/common/constants.dart';
 import 'package:hikari_novel_flutter/common/util.dart';
+import 'package:hikari_novel_flutter/widgets/book_cover_image.dart';
 
 import '../../../models/browsing_history.dart';
 import '../../../network/request.dart';
@@ -29,13 +30,12 @@ class BrowsingHistoryCard extends StatelessWidget {
                 height: 100,
                 child: AspectRatio(
                   aspectRatio: 9 / 13,
-                  child: CachedNetworkImage(
+                  child: BookCoverImage(
                     imageUrl: vh.img,
                     httpHeaders: Request.userAgent,
                     fit: BoxFit.cover,
-                    progressIndicatorBuilder:
-                        (context, url, downloadProgress) => Center(child: CircularProgressIndicator(value: downloadProgress.progress)),
-                    errorWidget: (context, url, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
+                    progressBuilder: (context, progress) => Center(child: CircularProgressIndicator(value: progress)),
+                    errorBuilder: (context, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
                   ),
                 ),
               ),

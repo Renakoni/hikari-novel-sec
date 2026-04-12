@@ -13,9 +13,13 @@ class DBService extends GetxService {
 
   Future<void> insertAllBookshelf(Iterable<BookshelfEntityData> data) => _db.insertAllBookshelf(data);
 
+  Future<void> upsertBookshelf(BookshelfEntityData data) => _db.upsertBookshelf(data);
+
   Future<void> deleteAllBookshelf() => _db.deleteAllBookshelf();
 
   Future<void> deleteDefaultBookshelf() => _db.deleteDefaultBookshelf();
+
+  Future<void> deleteBookshelfByAid(String aid) => _db.deleteBookshelfByAid(aid);
 
   Stream<List<BookshelfEntityData>> getBookshelfByClassId(String classId) => _db.getBookshelfByClassId(classId);
 
@@ -49,6 +53,8 @@ class DBService extends GetxService {
 
   Future<void> deleteReadHistoryByCid(String cid) => _db.deleteReadHistoryByCid(cid);
 
+  Future<void> deleteReadHistoryByAid(String aid) => _db.deleteReadHistoryByAid(aid);
+
   Future<void> upsertReadHistoryDirectly(ReadHistoryEntityData data) => _db.upsertReadHistoryDirectly(data);
 
   Future<void> deleteAllReadHistory() => _db.deleteAllReadHistory();
@@ -56,6 +62,8 @@ class DBService extends GetxService {
   Future<void> upsertNovelDetail(NovelDetailEntityData data) => _db.upsertNovelDetail(data);
 
   Future<NovelDetailEntityData?> getNovelDetail(String aid) => _db.getNovelDetail(aid);
+
+  Future<void> deleteNovelDetail(String aid) => _db.deleteNovelDetail(aid);
 
   Future<void> deleteAllNovelDetail() => _db.deleteAllNovelDetail();
 }

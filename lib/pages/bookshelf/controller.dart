@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hikari_novel_flutter/models/bookshelf.dart';
+import 'package:hikari_novel_flutter/models/novel_detail.dart';
 import 'package:hikari_novel_flutter/models/page_state.dart';
 import 'package:hikari_novel_flutter/models/resource.dart';
 import 'package:hikari_novel_flutter/network/api.dart';
 import 'package:hikari_novel_flutter/network/parser.dart';
 import 'package:hikari_novel_flutter/pages/main/controller.dart';
+import 'package:hikari_novel_flutter/service/local_book_service.dart';
+import 'package:lpinyin/lpinyin.dart';
 
 import '../../common/database/database.dart';
+import '../../widgets/state_page.dart';
 import '../../service/db_service.dart';
 
 class BookshelfController extends GetxController with GetTickerProviderStateMixin {
@@ -19,6 +23,7 @@ class BookshelfController extends GetxController with GetTickerProviderStateMixi
   final List tabs = ["0", "1", "2", "3", "4", "5"];
 
   RxBool isSelectionMode = false.obs;
+  RxSet<String> selectedTags = <String>{}.obs;
 
   @override
   void onInit() {
@@ -27,11 +32,16 @@ class BookshelfController extends GetxController with GetTickerProviderStateMixi
   }
 
   Future<void> refreshDefaultBookshelf() async {
+    final localBooks = await LocalBookService.getLocalBookshelfEntries();
     await DBService.instance.deleteDefaultBookshelf();
     await _insertAll(0);
+    if (localBooks.isNotEmpty) {
+      await DBService.instance.insertAllBookshelf(localBooks.where((book) => book.classId == "0"));
+    }
   }
 
   Future<String> refreshBookshelf() async {
+    final localBooks = await LocalBookService.getLocalBookshelfEntries();
     await DBService.instance.deleteAllBookshelf();
 
     final futures = Iterable.generate(6, (index) async {
@@ -39,6 +49,9 @@ class BookshelfController extends GetxController with GetTickerProviderStateMixi
       if (!result) return "update_failed".tr;
     });
     await Future.wait(futures);
+    if (localBooks.isNotEmpty) {
+      await DBService.instance.insertAllBookshelf(localBooks);
+    }
     return "update_successfully".tr;
   }
 
@@ -62,6 +75,62 @@ class BookshelfController extends GetxController with GetTickerProviderStateMixi
         }
     }
   }
+
+  Future<List<String>> getAvailableTagsForClass(String classId) async {
+    final entries = await DBService.instance.getAllBookshelf();
+    final classEntries = entries.where((item) => item.classId == classId);
+    final tags = <String>{};
+
+    for (final entry in classEntries) {
+      final detail = await DBService.instance.getNovelDetail(entry.aid);
+      if (detail == null) continue;
+      try {
+        final novelDetail = NovelDetail.fromString(detail.json);
+        tags.addAll(novelDetail.tags);
+        tags.addAll(novelDetail.personalTags);
+      } catch (_) {
+        continue;
+      }
+    }
+
+    final result = tags.toList()..sort(_compareTagsForDisplay);
+    return result;
+  }
+
+  int _compareTagsForDisplay(String a, String b) {
+    final aLatin = _isLatinLeading(a);
+    final bLatin = _isLatinLeading(b);
+    if (aLatin != bLatin) {
+      return aLatin ? -1 : 1;
+    }
+
+    final aKey = aLatin ? a.toLowerCase() : PinyinHelper.getPinyinE(a, separator: '', format: PinyinFormat.WITHOUT_TONE).toLowerCase();
+    final bKey = bLatin ? b.toLowerCase() : PinyinHelper.getPinyinE(b, separator: '', format: PinyinFormat.WITHOUT_TONE).toLowerCase();
+
+    final byKey = aKey.compareTo(bKey);
+    if (byKey != 0) return byKey;
+    return a.compareTo(b);
+  }
+
+  bool _isLatinLeading(String value) {
+    if (value.isEmpty) return true;
+    final code = value.codeUnitAt(0);
+    final isAsciiLetter = (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+    final isAsciiDigit = code >= 48 && code <= 57;
+    return isAsciiLetter || isAsciiDigit;
+  }
+
+  void clearTagFilters() => selectedTags.clear();
+
+  void toggleTagFilter(String tag) {
+    if (tag.isEmpty) return;
+    if (selectedTags.contains(tag)) {
+      selectedTags.remove(tag);
+    } else {
+      selectedTags.add(tag);
+    }
+    selectedTags.refresh();
+  }
 }
 
 class BookshelfContentController extends GetxController {
@@ -77,27 +146,167 @@ class BookshelfContentController extends GetxController {
   Rxn<Bookshelf> bookshelf = Rxn();
   Rx<PageState> pageState = Rx(PageState.loading);
   String errorMsg = "";
+  List<BookshelfNovelInfo> _allBooks = [];
 
   @override
   void onReady() {
     super.onReady();
 
     DBService.instance.getBookshelfByClassId(classId).listen((bss) async {
-      List<BookshelfNovelInfo> list = bss.map((i) => BookshelfNovelInfo(bid: i.bid, aid: i.aid, url: i.url, title: i.title, img: i.img)).toList();
+      _allBooks = bss.map((i) => BookshelfNovelInfo(bid: i.bid, aid: i.aid, url: i.url, title: i.title, img: i.img)).toList();
+      await _applyFilter();
+    });
 
-      if (list.isEmpty) {
-        bookshelf.value = null;
-        pageState.value = PageState.empty;
-      } else {
-        bookshelf.value = Bookshelf(list: list, classId: classId);
-        pageState.value = PageState.success;
-      }
+    ever<Set<String>>(_bookshelfController.selectedTags, (_) async {
+      await _applyFilter();
     });
   }
 
+  Future<void> _applyFilter() async {
+    final selectedTags = _bookshelfController.selectedTags.toSet();
+    List<BookshelfNovelInfo> list = _allBooks;
+
+    if (selectedTags.isNotEmpty) {
+      final filtered = <BookshelfNovelInfo>[];
+      for (final item in _allBooks) {
+        final detail = await DBService.instance.getNovelDetail(item.aid);
+        if (detail == null) continue;
+        try {
+          final novelDetail = NovelDetail.fromString(detail.json);
+          final tags = {...novelDetail.tags, ...novelDetail.personalTags};
+          if (tags.intersection(selectedTags).isNotEmpty) {
+            filtered.add(item);
+          }
+        } catch (_) {
+          continue;
+        }
+      }
+      list = filtered;
+    }
+
+    if (list.isEmpty) {
+      bookshelf.value = null;
+      pageState.value = PageState.empty;
+    } else {
+      bookshelf.value = Bookshelf(list: list, classId: classId);
+      pageState.value = PageState.success;
+    }
+  }
+
   void toggleCoverSelection(String aid) {
+    if (LocalBookService.isLocalAid(aid)) return;
     final selected = bookshelf.value!.list.firstWhere((v) => v.aid == aid).isSelected.value;
     bookshelf.value!.list.firstWhere((v) => v.aid == aid).isSelected.value = !selected;
+  }
+
+  Future<void> handleBookTap(BookshelfNovelInfo item) async {
+    if (!isSelectionMode) return;
+    if (LocalBookService.isLocalAid(item.aid)) {
+      showSnackBar(message: "本地导入书籍不参与当前批量网络操作", context: Get.context!);
+      return;
+    }
+    toggleCoverSelection(item.aid);
+  }
+
+  Future<void> handleBookLongPress(BookshelfNovelInfo item) async {
+    if (LocalBookService.isLocalAid(item.aid)) {
+      await _showLocalBookActions(item);
+      return;
+    }
+    if (!isSelectionMode) {
+      enterSelectionMode();
+      toggleCoverSelection(item.aid);
+    }
+  }
+
+  Future<void> _showLocalBookActions(BookshelfNovelInfo item) async {
+    final context = Get.context;
+    if (context == null) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(title: Text(item.title), subtitle: const Text("本地 EPUB · Local 标签不可删除")),
+                  ListTile(
+                    leading: const Icon(Icons.remove_circle_outline),
+                    title: const Text("从书架移除"),
+                    subtitle: const Text("仅从当前书架移除，保留本地导入记录和缓存"),
+                    onTap: () async {
+                      Navigator.of(sheetContext).pop();
+                      await _confirmLocalAction(
+                        title: "从书架移除",
+                        message: "这本本地书将从书架消失，但导入记录仍会保留。此操作可通过后续重新加入书架恢复。",
+                        action: () => LocalBookService.removeFromBookshelf(item.aid),
+                        successMessage: "已从书架移除",
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline),
+                    title: const Text("删除导入记录"),
+                    subtitle: const Text("删除书架、详情和阅读历史，保留本地缓存文件"),
+                    onTap: () async {
+                      Navigator.of(sheetContext).pop();
+                      await _confirmLocalAction(
+                        title: "删除导入记录",
+                        message: "这会删除这本本地书的导入记录、书架项和历史记录，但不会删除应用目录里的缓存文件。此操作不可逆。",
+                        action: () => LocalBookService.deleteImportedRecord(item.aid),
+                        successMessage: "已删除导入记录",
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.delete_forever_outlined, color: Theme.of(sheetContext).colorScheme.error),
+                    title: Text("删除导入记录和缓存文件", style: TextStyle(color: Theme.of(sheetContext).colorScheme.error)),
+                    subtitle: const Text("会一并删除封面、章节缓存和导入副本"),
+                    onTap: () async {
+                      Navigator.of(sheetContext).pop();
+                      await _confirmLocalAction(
+                        title: "彻底删除本地书",
+                        message: "这会删除导入记录、书架项、阅读历史，以及应用内部保存的封面、章节缓存和 EPUB 副本。此操作不可逆。",
+                        action: () => LocalBookService.deleteImportedRecordAndFiles(item.aid),
+                        successMessage: "已彻底删除本地书",
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmLocalAction({
+    required String title,
+    required String message,
+    required Future<void> Function() action,
+    required String successMessage,
+  }) async {
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Get.back(result: false), child: const Text("取消")),
+          FilledButton(onPressed: () => Get.back(result: true), child: const Text("确定")),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await action();
+    showSnackBar(message: successMessage, context: Get.context!);
   }
 
   Future removeNovelFromList() => Api.removeNovelFromList(list: getSelectedNovel(), classId: int.parse(classId));

@@ -42,6 +42,9 @@ dependencies:
 
   # html解析
   html: ^0.15.4
+  archive: ^4.0.9
+  xml: ^6.6.1
+  lpinyin: ^2.0.3
 
   # 异常捕捉
   catcher_2: ^2.1.2

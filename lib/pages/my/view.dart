@@ -22,6 +22,7 @@ class MyPage extends StatelessWidget {
             _buildUserInfoCard(context),
             const SizedBox(height: 20),
             ListTile(title: Text("browsing_history".tr), leading: const Icon(Icons.history), onTap: AppSubRouter.toBrowsingHistory),
+            ListTile(title: const Text("导入 EPUB"), leading: const Icon(Icons.upload_file_outlined), onTap: controller.importEpub),
             ListTile(title: Text("setting".tr), leading: const Icon(Icons.settings_outlined), onTap: AppSubRouter.toSetting),
             ListTile(title: Text("about".tr), leading: const Icon(Icons.info_outline), onTap: AppSubRouter.toAbout),
             ListTile(title: Text("logout".tr), leading: const Icon(Icons.logout), onTap: controller.logout),

@@ -14,12 +14,26 @@ class NovelDetail {
   final String imgUrl;
   final String introduce;
   final List<String> tags;
+  @JsonKey(defaultValue: <String>[])
+  final List<String> personalTags;
   final String heat;
   final String trending;
   final bool isAnimated;
   List<CatVolume> catalogue = [];
 
-  NovelDetail(this.title, this.author, this.status, this.finUpdate, this.imgUrl, this.introduce, this.tags, this.heat, this.trending, this.isAnimated);
+  NovelDetail(
+    this.title,
+    this.author,
+    this.status,
+    this.finUpdate,
+    this.imgUrl,
+    this.introduce,
+    this.tags,
+    this.personalTags,
+    this.heat,
+    this.trending,
+    this.isAnimated,
+  );
 
   factory NovelDetail.fromJson(Map<String, dynamic> json) => _$NovelDetailFromJson(json);
 

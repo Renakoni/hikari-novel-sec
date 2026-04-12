@@ -6,6 +6,7 @@ import 'package:hikari_novel_flutter/models/bookshelf.dart';
 import 'package:hikari_novel_flutter/models/novel_cover.dart';
 import 'package:hikari_novel_flutter/network/request.dart';
 import 'package:hikari_novel_flutter/router/app_sub_router.dart';
+import 'package:hikari_novel_flutter/widgets/book_cover_image.dart';
 
 class NovelCoverCard extends StatelessWidget {
   final NovelCover novelCover;
@@ -25,12 +26,12 @@ class NovelCoverCard extends StatelessWidget {
           children: [
             AspectRatio(
               aspectRatio: 9 / 13.5,
-              child: CachedNetworkImage(
-                imageUrl: novelCover.imageUrl!,
+              child: BookCoverImage(
+                imageUrl: novelCover.imageUrl ?? "",
                 httpHeaders: Request.userAgent,
                 fit: BoxFit.cover,
-                progressIndicatorBuilder: (context, url, downloadProgress) => Center(child: CircularProgressIndicator(value: downloadProgress.progress)),
-                errorWidget: (context, url, error) => Column(children: [Icon(Icons.error_outline), Text(error.toString())]),
+                progressBuilder: (context, progress) => Center(child: CircularProgressIndicator(value: progress)),
+                errorBuilder: (context, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
               ),
             ),
             Positioned.fill(
@@ -89,12 +90,12 @@ class BookshelfCoverCard extends StatelessWidget {
               children: [
                 AspectRatio(
                   aspectRatio: 9 / 13.5,
-                  child: CachedNetworkImage(
+                  child: BookCoverImage(
                     imageUrl: bookshelfNovelInfo.img,
                     httpHeaders: Request.userAgent,
                     fit: BoxFit.cover,
-                    progressIndicatorBuilder: (context, url, downloadProgress) => Center(child: CircularProgressIndicator(value: downloadProgress.progress)),
-                    errorWidget: (context, url, error) => Column(children: [Icon(Icons.error_outline), Text(error.toString())]),
+                    progressBuilder: (context, progress) => Center(child: CircularProgressIndicator(value: progress)),
+                    errorBuilder: (context, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
                   ),
                 ),
                 Positioned.fill(

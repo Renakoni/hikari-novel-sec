@@ -1,93 +1,128 @@
-### 📣自0.2.0版本开始，本软件开始转为使用网页源，放弃了mewx源📣
-### ⚠️我还要说明一点，如果你编译出来了，就自己用，不要发到其他地方。分享欲再旺盛也别发，你这是在害我们，老版的Hikari Novel就是一个例子。不要让我把这个项目也关停了，大家到时候都别用！⚠️
-
-<hr>
-
-<div align="center">
-
-  <div align="center">
-    <img src="./assets/images/logo_transparent.png" alt="Logo" height="250">
-  </div>
-
 # Hikari Novel
 
-  <p align="center"><font>使用Flutter构建的第三方轻小说文库客户端</font></p>
+基于 Flutter 的轻小说阅读客户端。
 
-  <div>
-    <img alt="GitHub Release" src="https://img.shields.io/github/v/release/15dd/hikari_novel_flutter?style=for-the-badge&color=%23408A23">
-    <img alt="License" src="https://img.shields.io/badge/License-MIT-Green?style=for-the-badge&color=rgb(164%2C25%2C49)">
-  </div>
+这个仓库是我基于原项目继续整理和自用的版本，主要目标还是 Android。当前不提供现成安装包，默认按“自行编译、自行使用”的方式维护。
 
-</div>
-
-
-## ✨ 功能
-- Material Design 3风格
-- 支持深浅模式切换
-- 适配平板
-- 支持章节缓存
-- 支持查看评论与回复
-- 阅读进度保存
-
-
-## 📱 支持平台
-| 平台      | 最小支持版本  | 备注                               |
-|----------|-------------|------------------------------------|
-| Android  | 6.0         | -                                  |
-| iOS      | N/A         | 理论上支持，未测试                    |
-| macOS    | N/A         | 理论上支持，未测试。未对键鼠操作进行适配  |
-| Windows  | 10          | 未对键鼠操作进行适配，处于半可用状态     |
-| Linux    | 不支持       | -                                  |
-| Web      | 不支持       | -                                  |
-
-注意️️：当iOS和macOS版本出问题时，我没办法修复，因为我没有苹果设备，所以仅保证安卓版能正常使用，但欢迎有能力的人士提PR
-
-
-## 🖼️ 软件截图
-- 手机
 <div align="center">
-  <img src="./readme/1.jpg" width="30%"></img> <img src="./readme/2.jpg" width="30%"></img> <img src="./readme/3.jpg" width="30%">
+  <img src="./assets/images/logo_transparent.png" alt="Logo" height="220">
 </div>
 
-- 平板
+## 项目现状
+
+- 主支持平台：Android
+- 当前仓库不发布 APK
+- 需要自行配置 Flutter / Android 环境后编译
+- 适合已经有基本开发经验、愿意自己折腾的人
+
+## 目前有的功能
+
+- 基础浏览、搜索、书架、详情、阅读
+- 阅读进度保存与继续阅读
+- 章节缓存
+- 深色 / 浅色模式
+- 平板适配
+- 本地 EPUB 导入
+- 本地书加入书架
+- 本地书个人标签
+- 书架标签筛选
+- 本地书删除与文件清理
+
+## 本地 EPUB 支持情况
+
+目前已经支持一套最小但可用的本地书流程：
+
+- 导入 `.epub`
+- 自动加入书架
+- 使用现有阅读器阅读
+- 记录阅读进度
+- 显示继续阅读
+- 为本地书添加个人标签
+- 从书架移除
+- 删除导入记录
+- 删除导入记录并清理缓存文件
+
+说明：
+
+- 本地书会带有 `Local`、`EPUB` 这类默认标签
+- 默认标签不可删除
+- 个人标签可以自行添加和删除
+
+## 平台说明
+
+| 平台 | 状态 | 备注 |
+| --- | --- | --- |
+| Android | 可用 | 主要维护目标 |
+| Windows | 可编译，体验一般 | 更适合调试，不建议当正式使用平台 |
+| iOS / macOS | 未实测 | 理论可编译，不保证可用 |
+| Linux / Web | 不作为当前目标 | 未适配 |
+
+## 截图
+
+### 手机
+
 <div align="center">
-  <img src="./readme/1_tablet.png" width="80%"></img> <img src="./readme/2_tablet.png" width="80%"></img>
+  <img src="./readme/1.jpg" width="30%">
+  <img src="./readme/2.jpg" width="30%">
+  <img src="./readme/3.jpg" width="30%">
 </div>
 
+### 平板
 
-## ⛓️ 分支介绍
-- `main` 主分支。发布版本用
-- `develop` 开发分支。想要提pr的人请拉取这个分支进行开发，然后提pr时也请merge到这个分支
+<div align="center">
+  <img src="./readme/1_tablet.png" width="80%">
+  <img src="./readme/2_tablet.png" width="80%">
+</div>
 
+## 编译
 
-## 📦 安装
-本项目不提供安装包，请参考下方 `编译` 自行编译使用
+我的环境里至少验证过 Android 编译链可以正常工作。大致步骤：
 
+1. 安装 Flutter
+2. 安装 Android Studio / Android SDK
+3. 克隆仓库
+4. 安装依赖
+5. 编译 APK
 
-## 💻 编译
-- ##### 我的开发环境
-  ```
-  [√] Flutter (Channel stable, 3.38.7, on Microsoft Windows [版本 10.0.26200.7840], locale zh-CN)
-  [√] Windows Version (Windows 11 or higher, 25H2, 2009)
-  [√] Android toolchain - develop for Android devices (Android SDK version 36.1.0)
-  [√] Visual Studio - develop Windows apps (Visual Studio 生成工具 2026 18.2.0)
-  ```
-- ##### 编译
-  1. 克隆此仓库
-  2. 安装flutter，参考 [flutter.dev](https://flutter.dev/docs/get-started/install)
-  3. 编译出对应平台的安装包，如 `flutter build apk`
+常用命令：
 
-## 🧑‍💻 交流
-&nbsp;&nbsp;<a href="https://t.me/+CUSABNkX5U83NGNl"><img alt="Static Badge" src="https://img.shields.io/badge/Telegram-加入群组-blue?style=for-the-badge&logo=telegram"></a>
+```bash
+flutter pub get
+flutter run
+flutter build apk --debug
+flutter build apk --release
+```
 
+如果只是想先验证功能，先打 `debug` 包最省事。
 
-## 📣 声明
-- 本项目是个人为了兴趣以及学习移动端开发而开发的，仅用于学习和测试
-- 本项目所用API均从轻小说文库官方网站收集，不提供任何破解内容
-- 本项目是个人项目，与轻小说文库官方无关，请注意辨别
+## 使用说明
 
+- 默认依赖文库站点相关接口
+- 网络环境、节点状态、站点风控都会影响使用
+- 模拟器环境比真机更容易触发风控
+- 如果遇到 Cloudflare 拦截，优先换真机测试
 
-## 📖 参考
+## 安装包说明
+
+这个仓库不提供 APK Release。
+
+原因很简单：
+
+- 这个项目更偏自用和学习
+- 站点环境和风控并不稳定
+- 公开分发安装包没必要，也容易带来额外问题
+
+如果你确实需要使用，建议自己编译。
+
+## 说明
+
+- 本项目仅用于学习、研究和个人使用
+- 项目内容与相关站点官方无关
+- 请不要将本仓库理解为官方客户端
+- 若你打算继续分发、二次发布或公开传播，请自己承担相应责任
+
+## 致谢
+
 - [flutter_dmzj](https://github.com/xiaoyaocz/flutter_dmzj)
 - [venera](https://github.com/venera-app/venera)
 - [mihon](https://github.com/mihonapp/mihon)
@@ -95,7 +130,3 @@
 - [pilipala](https://github.com/guozhigq/pilipala)
 - [PiliPalaX](https://github.com/orz12/PiliPalaX)
 - [PiliPlus](https://github.com/bggRGjQaUbCoE/PiliPlus)
-- AI
-
-## ⭐ 星标数趋势
-[![星标数趋势](https://starchart.cc/15dd/hikari_novel_flutter.svg?variant=adaptive)](https://starchart.cc/15dd/hikari_novel_flutter)

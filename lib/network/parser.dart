@@ -151,7 +151,7 @@ class Parser {
     final tags = tag.replaceRange(0, 7, "").split(" ");
     final heat = "heat".tr + tempHeat.substring(5, 7);
 
-    return NovelDetail(title, author, status, finUpdate, imgUrl, introduce, tags, heat, trending, isAnimated);
+    return NovelDetail(title, author, status, finUpdate, imgUrl, introduce, tags, [], heat, trending, isAnimated);
   }
 
   static int getMaxNum(String html) {

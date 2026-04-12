@@ -37,17 +37,12 @@ class BookshelfContentView extends StatelessWidget {
                               bookshelfNovelInfo: item,
                               onTap: () {
                                 if (controller.isSelectionMode) {
-                                  controller.toggleCoverSelection(item.aid);
+                                  controller.handleBookTap(item);
                                 } else {
                                   AppSubRouter.toNovelDetail(aid: item.aid);
                                 }
                               },
-                              onLongPress: () {
-                                if (!controller.isSelectionMode) {
-                                  controller.enterSelectionMode();
-                                  controller.toggleCoverSelection(item.aid);
-                                }
-                              },
+                              onLongPress: () => controller.handleBookLongPress(item),
                             );
                           }).toList(),
                         ),

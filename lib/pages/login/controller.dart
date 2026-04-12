@@ -16,6 +16,7 @@ import '../../models/resource.dart';
 import '../../network/api.dart';
 import '../../network/parser.dart';
 import '../../service/db_service.dart';
+import '../../service/local_book_service.dart';
 import '../../service/local_storage_service.dart';
 
 class LoginController extends GetxController {
@@ -91,12 +92,16 @@ class LoginController extends GetxController {
   }
 
   Future<void> _refreshBookshelf() async {
+    final localBooks = await LocalBookService.getLocalBookshelfEntries();
     await DBService.instance.deleteAllBookshelf();
 
     final futures = Iterable.generate(6, (index) async {
       await _insertAll(index);
     });
     await Future.wait(futures);
+    if (localBooks.isNotEmpty) {
+      await DBService.instance.insertAllBookshelf(localBooks);
+    }
   }
 
   Future<void> _insertAll(int index) async {

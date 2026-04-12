@@ -1,5 +1,4 @@
 import 'package:blur/blur.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:expandable_text/expandable_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -14,8 +13,8 @@ import 'package:hikari_novel_flutter/pages/novel_detail/widgets/icon_text.dart';
 import 'package:hikari_novel_flutter/router/app_sub_router.dart';
 import 'package:hikari_novel_flutter/router/route_path.dart';
 import 'package:hikari_novel_flutter/service/db_service.dart';
+import 'package:hikari_novel_flutter/widgets/book_cover_image.dart';
 
-import '../../network/request.dart';
 import '../../service/local_storage_service.dart';
 import '../../widgets/state_page.dart';
 
@@ -32,8 +31,10 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
   late final NovelDetailController controller;
   final RxDouble _opacity = 0.0.obs;
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _tagInputController = TextEditingController();
 
   bool _isFabVisible = false;
+  bool _isAddingTagInline = false;
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _tagInputController.dispose();
     super.dispose();
   }
 
@@ -134,11 +136,7 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: controller.novelDetail.value!.tags.map((e) => Chip(label: Text(e), padding: const EdgeInsets.fromLTRB(8, 0, 8, 0))).toList(),
-              ),
+              child: _buildTags(context),
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
@@ -190,7 +188,7 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
       title: Obx(() => AnimatedOpacity(opacity: _opacity.value, duration: const Duration(milliseconds: 200), child: Text(controller.novelDetail.value!.title))),
       titleSpacing: 0,
       actions: [
-        IconButton(onPressed: controller.enterSelectionMode, icon: Icon(Icons.download_outlined), tooltip: "cache".tr),
+        if (!controller.isLocalBook) IconButton(onPressed: controller.enterSelectionMode, icon: Icon(Icons.download_outlined), tooltip: "cache".tr),
         PopupMenuButton<_MenuItem>(
           icon: const Icon(Icons.more_vert),
           onSelected: (value) {
@@ -203,8 +201,8 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
             }
           },
           itemBuilder: (context) => [
-            PopupMenuItem(value: _MenuItem.cacheQueue, child: Text("view_cache_queue".tr)),
-            PopupMenuItem(value: _MenuItem.deleteCache, child: Text("delete_cache".tr)),
+            if (!controller.isLocalBook) PopupMenuItem(value: _MenuItem.cacheQueue, child: Text("view_cache_queue".tr)),
+            if (!controller.isLocalBook) PopupMenuItem(value: _MenuItem.deleteCache, child: Text("delete_cache".tr)),
             PopupMenuItem(value: _MenuItem.delAllReadHistory, child: Text("del_all_read_history".tr)),
           ],
         ),
@@ -222,13 +220,12 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
             child: Blur(
               blur: 3,
               blurColor: Theme.of(context).colorScheme.surface,
-              child: CachedNetworkImage(
+              child: BookCoverImage(
                 width: double.infinity,
                 imageUrl: detail.imgUrl,
-                httpHeaders: Request.userAgent,
                 fit: BoxFit.fitWidth,
-                progressIndicatorBuilder: (context, url, downloadProgress) => Center(child: CircularProgressIndicator(value: downloadProgress.progress)),
-                errorWidget: (context, url, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
+                progressBuilder: (context, progress) => Center(child: CircularProgressIndicator(value: progress)),
+                errorBuilder: (context, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
               ),
             ),
           ),
@@ -259,15 +256,16 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
                   elevation: 0,
                   clipBehavior: Clip.hardEdge,
                   child: GestureDetector(
-                    onTap: () => Get.toNamed(RoutePath.photo, arguments: {"gallery_mode": false, "url": detail.imgUrl}),
-                    child: CachedNetworkImage(
+                    onTap: controller.isLocalBook ? null : () => Get.toNamed(RoutePath.photo, arguments: {"gallery_mode": false, "url": detail.imgUrl}),
+                    child: SizedBox(
                       width: 120,
                       height: 180,
-                      imageUrl: detail.imgUrl,
-                      httpHeaders: Request.userAgent,
-                      fit: BoxFit.cover,
-                      progressIndicatorBuilder: (context, url, downloadProgress) => Center(child: CircularProgressIndicator(value: downloadProgress.progress)),
-                      errorWidget: (context, url, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
+                      child: BookCoverImage(
+                        imageUrl: detail.imgUrl,
+                        fit: BoxFit.cover,
+                        progressBuilder: (context, progress) => Center(child: CircularProgressIndicator(value: progress)),
+                        errorBuilder: (context, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
+                      ),
                     ),
                   ),
                 ),
@@ -310,13 +308,15 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
                       onPressed: () => controller.isInBookshelf.value ? controller.removeFromBookshelf() : controller.addToBookshelf(),
                     ),
                   ),
-                  BottomTextIconButton(label: "recommend".tr, icon: Icons.recommend_outlined, onPressed: controller.recommendThisNovel),
-                  BottomTextIconButton(label: "Web", icon: Icons.public, onPressed: controller.openWithBrowser),
-                  BottomTextIconButton(
-                    label: "comment".tr,
-                    icon: Icons.comment_outlined,
-                    onPressed: () => AppSubRouter.toComment(aid: widget.aid),
-                  ),
+                  if (!controller.isLocalBook) ...[
+                    BottomTextIconButton(label: "recommend".tr, icon: Icons.recommend_outlined, onPressed: controller.recommendThisNovel),
+                    BottomTextIconButton(label: "Web", icon: Icons.public, onPressed: controller.openWithBrowser),
+                    BottomTextIconButton(
+                      label: "comment".tr,
+                      icon: Icons.comment_outlined,
+                      onPressed: () => AppSubRouter.toComment(aid: widget.aid),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -325,6 +325,85 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
         ),
       ],
     );
+  }
+
+  Widget _buildTags(BuildContext context) {
+    final detail = controller.novelDetail.value!;
+    final tags = detail.tags;
+    final personalTags = detail.personalTags;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        ...tags.map(
+          (tag) => Chip(
+            label: Text(tag),
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+          ),
+        ),
+        ...personalTags.map(
+          (tag) => InputChip(
+            label: Text(tag),
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+            onDeleted: () => controller.removePersonalTag(tag),
+          ),
+        ),
+        ActionChip(
+          avatar: const Icon(Icons.add, size: 18),
+          label: const Text("Add Tag"),
+          onPressed: () {
+            setState(() {
+              _isAddingTagInline = true;
+            });
+          },
+        ),
+        if (_isAddingTagInline)
+          SizedBox(
+            width: 220,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _tagInputController,
+                    autofocus: true,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      hintText: "Enter tag",
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: (_) => _submitInlineTag(),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _submitInlineTag,
+                  icon: const Icon(Icons.check),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _isAddingTagInline = false;
+                      _tagInputController.clear();
+                    });
+                  },
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _submitInlineTag() {
+    final tag = _tagInputController.text.trim();
+    if (tag.isEmpty) return;
+    controller.addPersonalTag(tag);
+    setState(() {
+      _isAddingTagInline = false;
+      _tagInputController.clear();
+    });
   }
 
   //将目录构建为一个 Sliver（每个卷作为一个 item）
@@ -495,6 +574,7 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              if (!controller.isLocalBook)
               Expanded(
                 child: TextButton.icon(
                   onPressed: () async { //TODO 下载数量限制
