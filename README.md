@@ -4,13 +4,15 @@
 
 这个仓库是我在 [hikari_novel_flutter](https://github.com/15dd/hikari_novel_flutter) 的基础上继续整理的个人维护版本，同时也参考和沿用了 [wenku8reader](https://github.com/15dd/wenku8reader) 的部分资源与思路。当前不提供现成 APK，默认按“自行编译、自行使用”的方式维护。
 
+当前维护仓库：[hikari-novel-sec](https://github.com/Renakoni/hikari-novel-sec)
+
 ## 说明与来源
 
 这个版本不是从零重写的项目，而是在原项目基础上继续调整：
 
 - 补本地 EPUB 导入、阅读和清理流程
 - 调整书架、标签和筛选体验
-- 扩展听书功能，保留系统 TTS，并加入火山引擎 TTS 的实验支持
+- 扩展听书功能，保留系统 TTS，并加入火山引擎、Google Cloud TTS 的实验支持
 - 做一些适合个人使用的工程整理和小修复
 
 这个仓库能继续往前做，离不开原作者和历史贡献者前面的工作。建议第一次接触这个项目的人也去看看原仓库：
@@ -82,6 +84,8 @@ Google 模式需要用户自己填写 Google Cloud TTS API Key。Google 的 `spe
 - 云端 TTS 需要网络和可用额度
 - 不建议把自己的 Access Key 提交到公开仓库
 - 小说长文本会被分块请求，实际听感仍然会受音色、模型和文本结构影响
+- 云端 TTS 生成的音频缓存会在 App 冷启动时自动清理，避免缓存长期堆积
+- 当前没有保留“听书时自动定位/高亮正在播放段落”的功能；这部分同步效果还不够稳定，后续如果重做会单独处理
 
 ## 平台说明
 
