@@ -32,6 +32,8 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/tools/
+temp_epub_debug.dart
 
 # Symbolication related
 app.*.symbols

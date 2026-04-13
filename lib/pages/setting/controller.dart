@@ -8,18 +8,12 @@ import '../../service/local_storage_service.dart';
 
 
 class SettingController extends GetxController {
-  RxBool isAutoCheckUpdate = LocalStorageService.instance.getIsAutoCheckUpdate().obs;
   Rx<Language> language = Rx(LocalStorageService.instance.getLanguage());
   RxBool isRelativeTime = LocalStorageService.instance.getIsRelativeTime().obs;
   Rx<Wenku8Node> wenku8Node = Rx(LocalStorageService.instance.getWenku8Node());
   Rx<ThemeMode> themeMode = Rx(LocalStorageService.instance.getThemeMode());
   RxBool isDynamicColor = LocalStorageService.instance.getIsDynamicColor().obs;
   Rx<Color> customColor = Rx(LocalStorageService.instance.getCustomColor());
-
-  void changeIsAutoCheckUpdate(bool enabled) {
-    isAutoCheckUpdate.value = enabled;
-    LocalStorageService.instance.setIsAutoCheckUpdate(enabled);
-  }
 
   void changeIsRelativeTime(bool enabled) {
     isRelativeTime.value = enabled;

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hikari_novel_flutter/models/bookshelf.dart';
 import 'package:hikari_novel_flutter/models/novel_detail.dart';
@@ -15,7 +15,7 @@ import '../../widgets/state_page.dart';
 import '../../service/db_service.dart';
 
 class BookshelfController extends GetxController with GetTickerProviderStateMixin {
-  RxInt tabIndex = 0.obs; //保存tab索引位置
+  RxInt tabIndex = 0.obs; //淇濆瓨tab绱㈠紩浣嶇疆
 
   Rx<PageState> pageState = Rx(PageState.bookshelfContent);
 
@@ -234,32 +234,21 @@ class BookshelfContentController extends GetxController {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ListTile(title: Text(item.title), subtitle: const Text("本地 EPUB · Local 标签不可删除")),
+                  ListTile(
+                    title: Text(item.title),
+                    subtitle: const Text("本地 EPUB，Local 标签不可删除"),
+                  ),
                   ListTile(
                     leading: const Icon(Icons.remove_circle_outline),
                     title: const Text("从书架移除"),
-                    subtitle: const Text("仅从当前书架移除，保留本地导入记录和缓存"),
+                    subtitle: const Text("仅从当前书架移除，保留应用内部缓存文件"),
                     onTap: () async {
                       Navigator.of(sheetContext).pop();
                       await _confirmLocalAction(
                         title: "从书架移除",
-                        message: "这本本地书将从书架消失，但导入记录仍会保留。此操作可通过后续重新加入书架恢复。",
+                        message: "这本本地书将从当前书架消失。应用内部已导入的内容和缓存文件仍会保留，但不会继续在书架中显示。",
                         action: () => LocalBookService.removeFromBookshelf(item.aid),
                         successMessage: "已从书架移除",
-                      );
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.delete_outline),
-                    title: const Text("删除导入记录"),
-                    subtitle: const Text("删除书架、详情和阅读历史，保留本地缓存文件"),
-                    onTap: () async {
-                      Navigator.of(sheetContext).pop();
-                      await _confirmLocalAction(
-                        title: "删除导入记录",
-                        message: "这会删除这本本地书的导入记录、书架项和历史记录，但不会删除应用目录里的缓存文件。此操作不可逆。",
-                        action: () => LocalBookService.deleteImportedRecord(item.aid),
-                        successMessage: "已删除导入记录",
                       );
                     },
                   ),
@@ -363,3 +352,4 @@ class BookshelfSearchController extends GetxController {
 
   void back() => _bookshelfController.pageState.value = PageState.bookshelfContent;
 }
+

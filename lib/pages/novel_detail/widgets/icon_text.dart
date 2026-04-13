@@ -5,13 +5,15 @@ class IconText extends StatelessWidget {
   final String text;
   final Color? color;
   final bool? bold;
+  final int maxLines;
 
   const IconText({
     super.key,
     required this.icon,
     required this.text,
     this.color,
-    this.bold
+    this.bold,
+    this.maxLines = 1,
   });
 
   @override
@@ -19,8 +21,15 @@ class IconText extends StatelessWidget {
     return Row(
       children: [
         Icon(icon, size: 18),
-        SizedBox(width: 6),
-        Text(text, style: TextStyle(color: color, fontWeight: bold == true ? FontWeight.bold : null))
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            text,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: color, fontWeight: bold == true ? FontWeight.bold : null),
+          ),
+        ),
       ],
     );
   }

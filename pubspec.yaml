@@ -103,6 +103,7 @@ dependencies:
 
   # tts
   flutter_tts: ^4.2.0
+  just_audio: ^0.9.46
 
   # splash
   flutter_native_splash: ^2.4.7

@@ -1,9 +1,10 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hikari_novel_flutter/common/extension.dart';
+import 'package:hikari_novel_flutter/models/tts_provider_type.dart';
 import 'package:hikari_novel_flutter/service/tts_service.dart';
 import 'package:hikari_novel_flutter/widgets/custom_tile.dart';
 import 'package:hikari_novel_flutter/widgets/state_page.dart';
@@ -306,6 +307,30 @@ class ReaderSettingPage extends StatelessWidget {
     return ListView(
       children: [
         Obx(
+          () => NormalTile(
+            title: "听书来源",
+            subtitle: tts.providerLabel(tts.providerType.value),
+            leading: const Icon(Icons.hub_outlined),
+            trailing: const Icon(Icons.keyboard_arrow_down),
+            onTap: () {
+              Get.dialog(
+                RadioListDialog<TtsProviderType>(
+                  value: tts.providerType.value,
+                  values: [
+                    (TtsProviderType.system, tts.providerLabel(TtsProviderType.system)),
+                    (TtsProviderType.volcengine, tts.providerLabel(TtsProviderType.volcengine)),
+                  ],
+                  title: "听书来源",
+                ),
+              ).then((value) async {
+                if (value != null) {
+                  await tts.setProviderType(value);
+                }
+              });
+            },
+          ),
+        ),
+        Obx(
           () => SwitchTile(
             title: "enabled_listening".tr,
             leading: const Icon(Icons.record_voice_over_outlined),
@@ -313,66 +338,156 @@ class ReaderSettingPage extends StatelessWidget {
             value: tts.enabled.value,
           ),
         ),
-        NormalTile(
-          title: "open_tts_system_setting".tr,
-          leading: const Icon(Icons.settings_applications_outlined),
-          trailing: const Icon(Icons.open_in_new),
-          onTap: tts.openAndroidTtsSettings,
-        ),
         Obx(
           () => Offstage(
             offstage: !tts.enabled.value,
             child: Column(
               children: [
-                Obx(
-                  () => NormalTile(
-                    title: "tts_engine".tr,
-                    subtitle: tts.engine.value == null
-                        ? (Platform.isAndroid ? "auto".tr : "unsupportable_os_tip".tr)
-                        : tts.displayEngineName(tts.engine.value!),
-                    leading: const Icon(Icons.settings_outlined),
-                    trailing: const Icon(Icons.keyboard_arrow_down),
-                    onTap: () async {
-                      await tts.refreshEngines();
-                      Get.dialog(
-                        NormalListDialog(
-                          values: [(null, "auto".tr), ...tts.engines.map((value) => (value, tts.displayEngineName(value)))],
-                          title: "tts_engine".tr,
-                        ),
-                      ).then((value) async {
-                        if (value == null) {
-                          tts.applyEngine(null);
-                        } else {
-                          await tts.applyEngine(value);
-                          await tts.refreshVoices();
-                        }
-                      });
-                    },
+                if (tts.isSystemProvider) ...[
+                  NormalTile(
+                    title: "open_tts_system_setting".tr,
+                    leading: const Icon(Icons.settings_applications_outlined),
+                    trailing: const Icon(Icons.open_in_new),
+                    onTap: tts.openAndroidTtsSettings,
                   ),
-                ),
-                Obx(
-                  () => NormalTile(
-                    title: "timbre".tr,
-                    subtitle: tts.voice.value == null ? "auto".tr : "${tts.voice.value!["name"]}(${tts.voice.value!["locale"]})",
-                    leading: const Icon(Icons.surround_sound_outlined),
-                    trailing: const Icon(Icons.keyboard_arrow_down),
-                    onTap: () async {
-                      await tts.refreshVoices();
-                      Get.dialog(
-                        NormalListDialog(
-                          values: [(null, "auto".tr), ...tts.voices.map((value) => (value, "${value["name"]}(${value["locale"]})"))],
-                          title: "timbre".tr,
-                        ),
-                      ).then((value) async {
-                        if (value == null) {
-                          tts.applyVoice(null);
-                        } else {
-                          await tts.applyVoice(value);
-                        }
-                      });
-                    },
+                  Obx(
+                    () => NormalTile(
+                      title: "tts_engine".tr,
+                      subtitle: tts.engine.value == null
+                          ? (Platform.isAndroid ? "auto".tr : "unsupportable_os_tip".tr)
+                          : tts.displayEngineName(tts.engine.value!),
+                      leading: const Icon(Icons.settings_outlined),
+                      trailing: const Icon(Icons.keyboard_arrow_down),
+                      onTap: () async {
+                        await tts.refreshEngines();
+                        Get.dialog(
+                          NormalListDialog(
+                            values: [(null, "auto".tr), ...tts.engines.map((value) => (value, tts.displayEngineName(value)))],
+                            title: "tts_engine".tr,
+                          ),
+                        ).then((value) async {
+                          if (value == null) {
+                            tts.applyEngine(null);
+                          } else {
+                            await tts.applyEngine(value);
+                            await tts.refreshVoices();
+                          }
+                        });
+                      },
+                    ),
                   ),
-                ),
+                  Obx(
+                    () => NormalTile(
+                      title: "timbre".tr,
+                      subtitle: tts.voice.value == null ? "auto".tr : "${tts.voice.value!["name"]}(${tts.voice.value!["locale"]})",
+                      leading: const Icon(Icons.surround_sound_outlined),
+                      trailing: const Icon(Icons.keyboard_arrow_down),
+                      onTap: () async {
+                        await tts.refreshVoices();
+                        Get.dialog(
+                          NormalListDialog(
+                            values: [(null, "auto".tr), ...tts.voices.map((value) => (value, "${value["name"]}(${value["locale"]})"))],
+                            title: "timbre".tr,
+                          ),
+                        ).then((value) async {
+                          if (value == null) {
+                            tts.applyVoice(null);
+                          } else {
+                            await tts.applyVoice(value);
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                ],
+                if (tts.isVolcengineProvider) ...[
+                  Obx(
+                    () => NormalTile(
+                      title: "Volcengine App ID",
+                      subtitle: tts.volcengineAppId.value.isEmpty ? "未填写" : tts.volcengineAppId.value,
+                      leading: const Icon(Icons.badge_outlined),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: () => _editTextValue(
+                        context,
+                        title: "Volcengine App ID",
+                        initialValue: tts.volcengineAppId.value,
+                        onSaved: tts.setVolcengineAppId,
+                      ),
+                    ),
+                  ),
+                  Obx(
+                    () => NormalTile(
+                      title: "Access Key",
+                      subtitle: tts.volcengineAccessKey.value.isEmpty ? "未填写" : _maskSecret(tts.volcengineAccessKey.value),
+                      leading: const Icon(Icons.key_outlined),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: () => _editTextValue(
+                        context,
+                        title: "Access Key",
+                        initialValue: tts.volcengineAccessKey.value,
+                        obscureText: true,
+                        onSaved: tts.setVolcengineAccessKey,
+                      ),
+                    ),
+                  ),
+                  Obx(
+                    () => NormalTile(
+                      title: "Resource ID",
+                      subtitle: tts.volcengineResourceId.value,
+                      leading: const Icon(Icons.hub_outlined),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: () => _editTextValue(
+                        context,
+                        title: "Resource ID",
+                        initialValue: tts.volcengineResourceId.value,
+                        onSaved: tts.setVolcengineResourceId,
+                      ),
+                    ),
+                  ),
+                  Obx(
+                    () => NormalTile(
+                      title: "音色预设",
+                      subtitle: tts.volcengineSpeakerLabel(tts.volcengineSpeaker.value),
+                      leading: const Icon(Icons.library_music_outlined),
+                      trailing: const Icon(Icons.keyboard_arrow_down),
+                      onTap: () {
+                        Get.dialog(
+                          NormalListDialog(
+                            values: TtsService.volcengineSpeakerPresets
+                                .map((preset) => (preset.speaker, preset.label))
+                                .toList(),
+                            title: "音色预设",
+                          ),
+                        ).then((value) {
+                          if (value != null) {
+                            tts.setVolcengineSpeaker(value);
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  Obx(
+                    () => NormalTile(
+                      title: "Speaker",
+                      subtitle: tts.volcengineSpeaker.value.isEmpty ? "未填写" : "${tts.volcengineSpeakerLabel(tts.volcengineSpeaker.value)}\n${tts.volcengineSpeaker.value}",
+                      leading: const Icon(Icons.record_voice_over_outlined),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: () => _editTextValue(
+                        context,
+                        title: "Speaker",
+                        initialValue: tts.volcengineSpeaker.value,
+                        onSaved: tts.setVolcengineSpeaker,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    child: Text(
+                      "当前火山引擎模式使用豆包语音合成 1.0 的 V3 接口。默认 Resource ID 为 seed-tts-1.0。上面的 5 个音色预设已经内置，也保留了手动输入 Speaker 的方式，方便你后续继续试其他音色。",
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
                 const Divider(height: 1),
                 Obx(
                   () => SliderTile(
@@ -428,12 +543,62 @@ class ReaderSettingPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => tts.speak("你好，欢迎使用听书功能。"),
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text("试听测试"),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
               ],
             ),
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _editTextValue(
+    BuildContext context, {
+    required String title,
+    required String initialValue,
+    required void Function(String value) onSaved,
+    bool obscureText = false,
+  }) async {
+    final controller = TextEditingController(text: initialValue);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          obscureText: obscureText,
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            hintText: title,
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text("cancel".tr)),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(controller.text), child: Text("save".tr)),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      onSaved(result);
+    }
+  }
+
+  String _maskSecret(String value) {
+    if (value.length <= 8) return List.filled(value.length, "*").join();
+    return "${value.substring(0, 4)}****${value.substring(value.length - 4)}";
   }
 
   Widget _buildPadding() {
@@ -509,7 +674,7 @@ class ReaderSettingPage extends StatelessWidget {
     );
   }
 
-  /// [isChangeText] `true` 表示修改字体颜色，`false` 表示修改背景颜色`
+  /// [isChangeText] `true` 琛ㄧず淇敼瀛椾綋棰滆壊锛宍false` 琛ㄧず淇敼鑳屾櫙棰滆壊`
   void _buildColorPickerDialog(BuildContext context, bool isChangeText) async {
     final initColor = isChangeText
         ? controller.currentTextColor.value ?? Theme.of(context).colorScheme.onSurface
@@ -545,3 +710,4 @@ class ReaderSettingPage extends StatelessWidget {
     showSnackBar(message: "color_set_successfully".tr, context: Get.context!);
   }
 }
+

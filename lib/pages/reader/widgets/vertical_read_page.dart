@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -34,7 +36,7 @@ class VerticalReadPage extends StatefulWidget {
 
 class VerticalReadPageState extends State<VerticalReadPage> {
   late ScrollController controller;
-  late List<ReaderItem> _items;
+  List<ReaderItem> _items = [];
 
   bool _didRestorePosition = false;
 
@@ -127,6 +129,7 @@ class VerticalReadPageState extends State<VerticalReadPage> {
     paraIndent = widget.paraIndent;
     paraSpacing = widget.paraSpacing;
     if (text.isEmpty && images.isEmpty) {
+      _items = [];
       setState(() {});
       return;
     }
@@ -195,20 +198,28 @@ class VerticalReadPageState extends State<VerticalReadPage> {
   }
 
   Widget _buildImage(String url, int index) {
+    final isLocalFile = !url.startsWith('http') && File(url).existsSync();
     return RepaintBoundary(
       child: Padding(
         padding: const EdgeInsets.only(bottom: 20),
         child: GestureDetector(
           onDoubleTap: () => Get.toNamed(RoutePath.photo, arguments: {"gallery_mode": true, "list": widget.images, "index": index}),
           onLongPress: () => Get.toNamed(RoutePath.photo, arguments: {"gallery_mode": true, "list": widget.images, "index": index}),
-          child: CachedNetworkImage(
-            width: double.infinity,
-            imageUrl: url,
-            httpHeaders: Request.userAgent,
-            fit: BoxFit.fitWidth,
-            progressIndicatorBuilder: (context, url, progress) => Center(child: CircularProgressIndicator(value: progress.progress)),
-            errorWidget: (context, url, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
-          ),
+          child: isLocalFile
+              ? Image.file(
+                  File(url),
+                  width: double.infinity,
+                  fit: BoxFit.fitWidth,
+                  errorBuilder: (context, _, __) => const Column(children: [Icon(Icons.error_outline)]),
+                )
+              : CachedNetworkImage(
+                  width: double.infinity,
+                  imageUrl: url,
+                  httpHeaders: Request.userAgent,
+                  fit: BoxFit.fitWidth,
+                  progressIndicatorBuilder: (context, url, progress) => Center(child: CircularProgressIndicator(value: progress.progress)),
+                  errorWidget: (context, url, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
+                ),
         ),
       ),
     );

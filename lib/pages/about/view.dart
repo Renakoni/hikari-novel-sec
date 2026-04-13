@@ -7,8 +7,6 @@ import 'package:hikari_novel_flutter/service/dev_mode_service.dart';
 import 'package:hikari_novel_flutter/widgets/custom_tile.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../common/util.dart';
-
 class AboutPage extends StatelessWidget {
   AboutPage({super.key});
 
@@ -33,7 +31,6 @@ class AboutPage extends StatelessWidget {
               onTap: controller.onVersionTap,
             ),
           ),
-          NormalTile(title: "check_update".tr, leading: const Icon(Icons.update), onTap: () => Util.checkUpdate(true)),
           NormalTile(
             title: "open_source_license".tr,
             leading: const Icon(Icons.assignment_outlined),

@@ -117,14 +117,6 @@ class SettingPage extends StatelessWidget {
               value: controller.isRelativeTime.value,
             ),
           ),
-          Obx(
-            () => SwitchTile(
-              title: "auto_check_update".tr,
-              leading: const Icon(Icons.update),
-              onChanged: (v) => controller.changeIsAutoCheckUpdate(v),
-              value: controller.isAutoCheckUpdate.value,
-            ),
-          ),
         ],
       ),
     );

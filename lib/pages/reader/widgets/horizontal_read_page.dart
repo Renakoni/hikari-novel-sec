@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -390,17 +392,25 @@ class _HorizontalReadPageState extends State<HorizontalReadPage> with WidgetsBin
   }
 
   Widget _buildImage(int imageIndex) {
+    final imageUrl = (pages[imageIndex] as ImagePage).url;
+    final isLocalFile = !imageUrl.startsWith('http') && File(imageUrl).existsSync();
     return Center(
       child: GestureDetector(
         onDoubleTap: () => widget.onViewImage(imageIndex),
         onLongPress: () => widget.onViewImage(imageIndex),
-        child: CachedNetworkImage(
-          imageUrl: (pages[imageIndex] as ImagePage).url,
-          httpHeaders: Request.userAgent,
-          fit: BoxFit.contain,
-          progressIndicatorBuilder: (context, url, downloadProgress) => Center(child: CircularProgressIndicator(value: downloadProgress.progress)),
-          errorWidget: (context, url, error) => Center(child: Column(children: [Icon(Icons.error_outline), Text(error.toString())])),
-        ),
+        child: isLocalFile
+            ? Image.file(
+                File(imageUrl),
+                fit: BoxFit.contain,
+                errorBuilder: (context, _, __) => const Center(child: Column(children: [Icon(Icons.error_outline)])),
+              )
+            : CachedNetworkImage(
+                imageUrl: imageUrl,
+                httpHeaders: Request.userAgent,
+                fit: BoxFit.contain,
+                progressIndicatorBuilder: (context, url, downloadProgress) => Center(child: CircularProgressIndicator(value: downloadProgress.progress)),
+                errorWidget: (context, url, error) => Center(child: Column(children: [Icon(Icons.error_outline), Text(error.toString())])),
+              ),
       ),
     );
   }

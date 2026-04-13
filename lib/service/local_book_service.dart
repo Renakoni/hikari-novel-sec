@@ -73,9 +73,11 @@ class LocalBookService {
     final appDir = await getApplicationSupportDirectory();
     final importedBookDir = Directory(path.join(appDir.path, 'imported_books', aid));
     final coverDir = Directory(path.join(importedBookDir.path, 'cover'));
+    final contentImageDir = Directory(path.join(importedBookDir.path, 'content_images'));
     final chapterCacheDir = Directory(path.join(appDir.path, 'cached_chapter'));
     await importedBookDir.create(recursive: true);
     await coverDir.create(recursive: true);
+    await contentImageDir.create(recursive: true);
     await chapterCacheDir.create(recursive: true);
     await File(path.join(importedBookDir.path, 'source.epub')).writeAsBytes(await File(sourcePath).readAsBytes(), flush: true);
 
@@ -114,14 +116,29 @@ class LocalBookService {
       if (chapterRaw == null) continue;
 
       final chapterDoc = html_parser.parse(chapterRaw);
-      chapterDoc.querySelectorAll('img, script, style').forEach((element) => element.remove());
+      await _extractChapterImages(
+        archive: archive,
+        chapterDoc: chapterDoc,
+        chapterHref: manifestItem.href,
+        aid: aid,
+        chapterIndex: index,
+        contentImageDir: contentImageDir,
+      );
+      chapterDoc.querySelectorAll('script, style').forEach((element) => element.remove());
       final headingTitle = chapterDoc.querySelector('h1, h2, h3')?.text.trim();
       final documentTitle = chapterDoc.querySelector('title')?.text.trim();
       final chapterTitle = (headingTitle != null && headingTitle.isNotEmpty)
           ? headingTitle
           : ((documentTitle != null && documentTitle.isNotEmpty) ? documentTitle : "Chapter ${index + 1}");
-      final bodyHtml = chapterDoc.body?.innerHtml.trim();
+      var bodyHtml = chapterDoc.body?.innerHtml.trim();
       if (bodyHtml == null || bodyHtml.isEmpty) continue;
+      bodyHtml = await _rewriteImageReferencesInHtml(
+        archive: archive,
+        bodyHtml: bodyHtml,
+        chapterHref: manifestItem.href,
+        chapterIndex: index,
+        contentImageDir: contentImageDir,
+      );
 
       final cid = "${aid}_chapter_$index";
       await File(path.join(chapterCacheDir.path, "${aid}_$cid.txt")).writeAsString('<div id="content">$bodyHtml</div>');
@@ -231,6 +248,117 @@ class LocalBookService {
     final extension = path.extension(coverItem.href).isEmpty ? '.img' : path.extension(coverItem.href);
     final savedPath = path.join(coverDir.path, "cover$extension");
     await File(savedPath).writeAsBytes(bytes, flush: true);
+    return savedPath;
+  }
+
+  static Future<void> _extractChapterImages({
+    required Archive archive,
+    required dynamic chapterDoc,
+    required String chapterHref,
+    required String aid,
+    required int chapterIndex,
+    required Directory contentImageDir,
+  }) async {
+    final chapterDir = path.dirname(chapterHref) == '.' ? '' : path.dirname(chapterHref);
+    int imageIndex = 0;
+
+    for (final element in chapterDoc.querySelectorAll('img, image')) {
+      final attrName = _findImageSourceAttribute(element);
+      if (attrName == null) continue;
+
+      final src = element.attributes[attrName]?.trim();
+      if (src == null || src.isEmpty || src.startsWith('data:')) continue;
+
+      final resolvedPath = _normalizeArchivePath(path.join(chapterDir, src));
+      final file = _findArchiveFile(archive, resolvedPath);
+      if (file == null) continue;
+
+      final content = file.content;
+      final bytes = content is Uint8List ? content : Uint8List.fromList(content as List<int>);
+      final extension = path.extension(resolvedPath).isEmpty ? '.img' : path.extension(resolvedPath);
+      final savedPath = path.join(
+        contentImageDir.path,
+        'chapter_${chapterIndex}_image_${imageIndex++}$extension',
+      );
+      await File(savedPath).writeAsBytes(bytes, flush: true);
+      element.attributes[attrName] = savedPath;
+    }
+  }
+
+  static String? _findImageSourceAttribute(dynamic element) {
+    for (final attr in const ['src', 'xlink:href', 'href']) {
+      final value = element.attributes[attr];
+      if (value != null && value.trim().isNotEmpty) return attr;
+    }
+    return null;
+  }
+
+  static Future<String> _rewriteImageReferencesInHtml({
+    required Archive archive,
+    required String bodyHtml,
+    required String chapterHref,
+    required int chapterIndex,
+    required Directory contentImageDir,
+  }) async {
+    final chapterDir = path.dirname(chapterHref) == '.' ? '' : path.dirname(chapterHref);
+    final imageRefExp = RegExp(r'''(?:(src|xlink:href|href))=(["'])([^"']+)(\2)''', caseSensitive: false);
+    var imageIndex = 1000;
+    final rewritten = StringBuffer();
+    var lastEnd = 0;
+
+    for (final match in imageRefExp.allMatches(bodyHtml)) {
+      rewritten.write(bodyHtml.substring(lastEnd, match.start));
+
+      final attrName = match.group(1)!;
+      final quote = match.group(2)!;
+      final rawPath = match.group(3)!.trim();
+      final replacedPath = await _copyArchiveImageToLocal(
+        archive: archive,
+        chapterDir: chapterDir,
+        rawPath: rawPath,
+        contentImageDir: contentImageDir,
+        chapterIndex: chapterIndex,
+        imageIndex: imageIndex++,
+      );
+
+      if (replacedPath == null) {
+        rewritten.write(match.group(0)!);
+      } else {
+        rewritten.write('$attrName=$quote$replacedPath$quote');
+      }
+      lastEnd = match.end;
+    }
+
+    rewritten.write(bodyHtml.substring(lastEnd));
+    return rewritten.toString();
+  }
+
+  static Future<String?> _copyArchiveImageToLocal({
+    required Archive archive,
+    required String chapterDir,
+    required String rawPath,
+    required Directory contentImageDir,
+    required int chapterIndex,
+    required int imageIndex,
+  }) async {
+    if (rawPath.isEmpty || rawPath.startsWith('data:') || rawPath.startsWith('http')) {
+      return null;
+    }
+
+    final resolvedPath = _normalizeArchivePath(path.join(chapterDir, rawPath));
+    final file = _findArchiveFile(archive, resolvedPath);
+    if (file == null) return null;
+
+    final content = file.content;
+    final bytes = content is Uint8List ? content : Uint8List.fromList(content as List<int>);
+    final extension = path.extension(resolvedPath).isEmpty ? '.img' : path.extension(resolvedPath);
+    final savedPath = path.join(
+      contentImageDir.path,
+      'chapter_${chapterIndex}_image_${imageIndex}$extension',
+    );
+    if (!await File(savedPath).exists()) {
+      await File(savedPath).writeAsBytes(bytes, flush: true);
+    }
     return savedPath;
   }
 

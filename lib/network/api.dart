@@ -33,8 +33,6 @@ class Api {
 
   static Wenku8Node get wenku8Node => LocalStorageService.instance.getWenku8Node();
 
-  static String latestUrl = "https://api.github.com/repos/15dd/hikari_novel_flutter/releases/latest";
-
   /// 根据排名获取小说列表
   /// - [ranking] 排行榜种类
   /// - [index] 第几页
@@ -253,7 +251,5 @@ class Api {
   }
 
   /// 获取Github上面的最新版本
-  static Future<Resource> fetchLatestRelease() {
-    return Request.getCommonData(latestUrl);
-  }
+
 }

@@ -51,12 +51,17 @@ class LocalStorageService extends GetxService {
       kReaderTextStyleFilePath = "readerTextStyleFilePath",
       kReaderPageTurningAnimation = "readerPageTurningAnimation",
       kReaderTtsEnabled = "readerTtsEnabled",
+      kReaderTtsProvider = "readerTtsProvider",
       kReaderTtsEngine = "readerTtsEngine",
       kReaderTtsVoice = "readerTtsVoice",
       kReaderTtsRate = "readerTtsRate",
       kDevModeEnabled = "devModeEnabled",
       kReaderTtsPitch = "readerTtsPitch",
       kReaderTtsVolume = "readerTtsVolume",
+      kReaderTtsVolcengineAppId = "readerTtsVolcengineAppId",
+      kReaderTtsVolcengineAccessKey = "readerTtsVolcengineAccessKey",
+      kReaderTtsVolcengineResourceId = "readerTtsVolcengineResourceId",
+      kReaderTtsVolcengineSpeaker = "readerTtsVolcengineSpeaker",
       kReaderParaIndent = "readerParaIndent",
       kReaderParaSpacing = "readerParaSpacing",
       kReaderBottomStatusBarHorizontalSpacing = "readerBottomStatusBarHorizontalSpacing";
@@ -207,6 +212,10 @@ class LocalStorageService extends GetxService {
 
   void setReaderTtsEnabled(bool enabled) => _reader.put(kReaderTtsEnabled, enabled);
 
+  String getReaderTtsProvider() => _reader.get(kReaderTtsProvider, defaultValue: "system");
+
+  void setReaderTtsProvider(String value) => _reader.put(kReaderTtsProvider, value);
+
   String? getReaderTtsEngine() => _reader.get(kReaderTtsEngine);
 
   void setReaderTtsEngine(String? value) => _reader.put(kReaderTtsEngine, value);
@@ -232,6 +241,22 @@ class LocalStorageService extends GetxService {
   double getReaderTtsVolume() => _reader.get(kReaderTtsVolume, defaultValue: 1.0);
 
   void setReaderTtsVolume(double value) => _reader.put(kReaderTtsVolume, value);
+
+  String getReaderTtsVolcengineAppId() => _reader.get(kReaderTtsVolcengineAppId, defaultValue: "");
+
+  void setReaderTtsVolcengineAppId(String value) => _reader.put(kReaderTtsVolcengineAppId, value);
+
+  String getReaderTtsVolcengineAccessKey() => _reader.get(kReaderTtsVolcengineAccessKey, defaultValue: "");
+
+  void setReaderTtsVolcengineAccessKey(String value) => _reader.put(kReaderTtsVolcengineAccessKey, value);
+
+  String getReaderTtsVolcengineResourceId() => _reader.get(kReaderTtsVolcengineResourceId, defaultValue: "seed-tts-1.0");
+
+  void setReaderTtsVolcengineResourceId(String value) => _reader.put(kReaderTtsVolcengineResourceId, value);
+
+  String getReaderTtsVolcengineSpeaker() => _reader.get(kReaderTtsVolcengineSpeaker, defaultValue: "");
+
+  void setReaderTtsVolcengineSpeaker(String value) => _reader.put(kReaderTtsVolcengineSpeaker, value);
 
   bool getDevModeEnabled() => _setting.get(kDevModeEnabled, defaultValue: false);
 

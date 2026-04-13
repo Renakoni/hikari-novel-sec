@@ -513,11 +513,14 @@ class Parser {
 
     // 提取所有img标签的src属性到List
     List<String> imgSrcList = [];
-    List<Element> imgElements = contentElement.querySelectorAll('img');
+    List<Element> imgElements = contentElement.querySelectorAll('img, image');
     for (var img in imgElements) {
-      String? src = img.attributes['src'];
+      String? src = img.attributes['src'] ?? img.attributes['xlink:href'] ?? img.attributes['href'];
       if (src != null && src.isNotEmpty) {
-        imgSrcList.add(ImageUrlHelper.normalize(src));
+        final normalized = src.startsWith('http') || src.contains(':\\') || src.startsWith('/')
+            ? ImageUrlHelper.normalize(src)
+            : src;
+        imgSrcList.add(normalized);
       }
     }
 
