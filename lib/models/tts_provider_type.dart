@@ -1,10 +1,12 @@
 enum TtsProviderType {
   system,
-  volcengine;
+  volcengine,
+  google;
 
   String get storageValue => switch (this) {
     TtsProviderType.system => "system",
     TtsProviderType.volcengine => "volcengine",
+    TtsProviderType.google => "google",
   };
 
   static TtsProviderType fromStorage(String? value) {

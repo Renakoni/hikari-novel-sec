@@ -4,9 +4,12 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:hikari_novel_flutter/models/tts_provider_type.dart';
+import 'package:hikari_novel_flutter/service/tts/providers/google_tts_provider.dart';
 import 'package:hikari_novel_flutter/service/tts/providers/system_tts_provider.dart';
 import 'package:hikari_novel_flutter/service/tts/providers/volcengine_tts_provider.dart';
 import 'package:hikari_novel_flutter/widgets/state_page.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../common/log.dart';
@@ -38,11 +41,19 @@ class TtsService extends GetxService {
   final isSessionActive = false.obs;
   final sessionTitle = ''.obs;
   final sessionProgress = 0.0.obs;
+  final currentChunkText = ''.obs;
+  final currentChunkIndex = 0.obs;
+  final currentChunkTotal = 0.obs;
 
   final volcengineAppId = ''.obs;
   final volcengineAccessKey = ''.obs;
   final volcengineResourceId = 'seed-tts-1.0'.obs;
   final volcengineSpeaker = ''.obs;
+  final googleApiKey = ''.obs;
+  final googleLanguageCode = 'cmn-CN'.obs;
+  final googleVoice = ''.obs;
+  final googleSpeakingRate = 1.0.obs;
+  final googlePitch = 0.0.obs;
 
   static const List<({String label, String speaker, String? emotion, int? emotionScale})> volcengineSpeakerPresets = [
     (label: "深夜播客 neutral", speaker: "zh_male_shenyeboke_emo_v2_mars_bigtts", emotion: "neutral", emotionScale: 2),
@@ -52,23 +63,44 @@ class TtsService extends GetxService {
     (label: "温柔淑女", speaker: "zh_female_wenroushunv_mars_bigtts", emotion: null, emotionScale: null),
   ];
 
+  static const List<({String label, String voice, String gender})> googleVoicePresets = [
+    (label: "Enceladus", voice: "cmn-CN-Chirp3-HD-Enceladus", gender: "男声"),
+    (label: "Fenrir", voice: "cmn-CN-Chirp3-HD-Fenrir", gender: "男声"),
+    (label: "Iapetus", voice: "cmn-CN-Chirp3-HD-Iapetus", gender: "男声"),
+    (label: "Orus", voice: "cmn-CN-Chirp3-HD-Orus", gender: "男声"),
+    (label: "Puck", voice: "cmn-CN-Chirp3-HD-Puck", gender: "男声"),
+    (label: "Rasalgethi", voice: "cmn-CN-Chirp3-HD-Rasalgethi", gender: "男声"),
+    (label: "Schedar", voice: "cmn-CN-Chirp3-HD-Schedar", gender: "男声"),
+    (label: "Umbriel", voice: "cmn-CN-Chirp3-HD-Umbriel", gender: "男声"),
+    (label: "Gacrux", voice: "cmn-CN-Chirp3-HD-Gacrux", gender: "女声"),
+    (label: "Vindemiatrix", voice: "cmn-CN-Chirp3-HD-Vindemiatrix", gender: "女声"),
+  ];
+
   List<String> _chunks = const [];
   int _chunkIndex = 0;
-  static const int _maxChunkLen = 280;
+  static const int _defaultMaxChunkLen = 280;
+  static const int _googleMaxChunkLen = 500;
+  static const int _googleMaxSentenceLen = 180;
 
   final SystemTtsProvider _systemProvider = SystemTtsProvider();
   final VolcengineTtsProvider _volcengineProvider = VolcengineTtsProvider();
+  final GoogleTtsProvider _googleProvider = GoogleTtsProvider();
   late TtsProvider _provider;
   StreamSubscription<TtsProviderEvent>? _providerSub;
   bool _initialized = false;
+  bool _pauseRequested = false;
 
   bool get isSystemProvider => providerType.value == TtsProviderType.system;
 
   bool get isVolcengineProvider => providerType.value == TtsProviderType.volcengine;
 
+  bool get isGoogleProvider => providerType.value == TtsProviderType.google;
+
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
+
+    await _clearStartupAudioCache();
 
     enabled.value = LocalStorageService.instance.getReaderTtsEnabled();
     providerType.value = TtsProviderType.fromStorage(LocalStorageService.instance.getReaderTtsProvider());
@@ -90,13 +122,35 @@ class TtsService extends GetxService {
       volcengineSpeaker.value = volcengineSpeakerPresets.first.speaker;
       LocalStorageService.instance.setReaderTtsVolcengineSpeaker(volcengineSpeaker.value);
     }
+    googleApiKey.value = LocalStorageService.instance.getReaderTtsGoogleApiKey();
+    googleLanguageCode.value = LocalStorageService.instance.getReaderTtsGoogleLanguageCode();
+    googleVoice.value = LocalStorageService.instance.getReaderTtsGoogleVoice();
+    if (googleVoice.value.isEmpty) {
+      googleVoice.value = googleVoicePresets.first.voice;
+      LocalStorageService.instance.setReaderTtsGoogleVoice(googleVoice.value);
+    }
+    googleSpeakingRate.value = LocalStorageService.instance.getReaderTtsGoogleSpeakingRate();
+    googlePitch.value = LocalStorageService.instance.getReaderTtsGooglePitch();
 
     await _bindProvider(providerType.value, reinitialize: true);
+  }
+
+  Future<void> _clearStartupAudioCache() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final cacheDir = Directory(path.join(dir.path, "tts_cache"));
+      if (await cacheDir.exists()) {
+        await cacheDir.delete(recursive: true);
+      }
+    } catch (e) {
+      Log.d("[TtsService] clear startup audio cache failed: $e");
+    }
   }
 
   String providerLabel(TtsProviderType type) => switch (type) {
     TtsProviderType.system => "系统 TTS",
     TtsProviderType.volcengine => "火山引擎",
+    TtsProviderType.google => "Google TTS",
   };
 
   String displayEngineName(String enginePackage) {
@@ -193,11 +247,42 @@ class TtsService extends GetxService {
     _syncVolcengineConfig();
   }
 
+  void setGoogleApiKey(String value) {
+    googleApiKey.value = value.trim();
+    LocalStorageService.instance.setReaderTtsGoogleApiKey(googleApiKey.value);
+    _syncGoogleConfig();
+  }
+
+  void setGoogleVoice(String value) {
+    googleVoice.value = value.trim();
+    LocalStorageService.instance.setReaderTtsGoogleVoice(googleVoice.value);
+    _syncGoogleConfig();
+  }
+
+  void setGoogleSpeakingRate(double value) {
+    googleSpeakingRate.value = value.clamp(0.25, 4.0);
+    LocalStorageService.instance.setReaderTtsGoogleSpeakingRate(googleSpeakingRate.value);
+    _syncGoogleConfig();
+  }
+
+  void setGooglePitch(double value) {
+    googlePitch.value = value.clamp(-20.0, 20.0);
+    LocalStorageService.instance.setReaderTtsGooglePitch(googlePitch.value);
+    _syncGoogleConfig();
+  }
+
   String volcengineSpeakerLabel(String speaker) {
     for (final preset in volcengineSpeakerPresets) {
       if (preset.speaker == speaker) return preset.label;
     }
     return speaker;
+  }
+
+  String googleVoiceLabel(String voice) {
+    for (final preset in googleVoicePresets) {
+      if (preset.voice == voice) return "${preset.label}（${preset.gender}）";
+    }
+    return voice;
   }
 
   ({String label, String speaker, String? emotion, int? emotionScale})? _volcenginePresetForSpeaker(String speaker) {
@@ -219,6 +304,7 @@ class TtsService extends GetxService {
       await _provider.setPitch(pitch.value);
       await _provider.setVolume(volume.value);
       _syncVolcengineConfig();
+      _syncGoogleConfig();
       if (text.trim().isNotEmpty) {
         if (wasSession) {
           await startChapter(text, title: title);
@@ -233,6 +319,7 @@ class TtsService extends GetxService {
     await _provider.setPitch(pitch.value);
     await _provider.setVolume(volume.value);
     _syncVolcengineConfig();
+    _syncGoogleConfig();
   }
 
   Future<void> openAndroidTtsSettings() async {
@@ -274,23 +361,31 @@ class TtsService extends GetxService {
     _chunks = const [];
     _chunkIndex = 0;
     sessionProgress.value = 0.0;
-    lastSpokenText.value = text;
-    await _provider.speak(text);
+    final cleaned = _sanitizeTextForTts(text);
+    lastSpokenText.value = cleaned;
+    await _provider.speak(cleaned);
   }
 
   Future<void> startChapter(String fullText, {String title = ''}) async {
     if (!enabled.value) return;
     await _prepareProvider();
-    final cleaned = fullText.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final cleaned = _sanitizeTextForTts(fullText);
     if (cleaned.isEmpty) return;
 
     sessionTitle.value = title;
     isSessionActive.value = true;
+    _pauseRequested = false;
     isPaused.value = false;
     lastSpokenText.value = cleaned;
 
-    _chunks = _splitToChunks(cleaned);
+    _chunks = _splitToChunks(
+      cleaned,
+      maxChunkLen: _currentMaxChunkLen,
+      maxSentenceLen: isGoogleProvider ? _googleMaxSentenceLen : null,
+    );
     _chunkIndex = 0;
+    currentChunkIndex.value = 0;
+    currentChunkTotal.value = _chunks.length;
     sessionProgress.value = 0.0;
 
     await _speakCurrentChunk();
@@ -308,6 +403,9 @@ class TtsService extends GetxService {
     }
 
     if (isPaused.value) {
+      _pauseRequested = false;
+      isPlaying.value = true;
+      isPaused.value = false;
       await _provider.resume();
       return;
     }
@@ -317,6 +415,9 @@ class TtsService extends GetxService {
 
   Future<void> pauseSession() async {
     if (!enabled.value) return;
+    _pauseRequested = true;
+    isPlaying.value = false;
+    isPaused.value = true;
     await _provider.pause();
   }
 
@@ -334,6 +435,7 @@ class TtsService extends GetxService {
     _provider = switch (type) {
       TtsProviderType.system => _systemProvider,
       TtsProviderType.volcengine => _volcengineProvider,
+      TtsProviderType.google => _googleProvider,
     };
 
     if (reinitialize) {
@@ -342,6 +444,7 @@ class TtsService extends GetxService {
 
     _providerSub = _provider.events.listen(_handleProviderEvent);
     _syncVolcengineConfig();
+    _syncGoogleConfig();
     await _provider.setRate(rate.value);
     await _provider.setPitch(pitch.value);
     await _provider.setVolume(volume.value);
@@ -366,6 +469,7 @@ class TtsService extends GetxService {
     await _provider.setPitch(pitch.value);
     await _provider.setVolume(volume.value);
     _syncVolcengineConfig();
+    _syncGoogleConfig();
   }
 
   void _syncVolcengineConfig() {
@@ -379,6 +483,15 @@ class TtsService extends GetxService {
       ..emotionScale = _volcenginePresetForSpeaker(volcengineSpeaker.value)?.emotionScale;
   }
 
+  void _syncGoogleConfig() {
+    _googleProvider
+      ..apiKey = googleApiKey.value
+      ..languageCode = googleLanguageCode.value
+      ..voiceName = googleVoice.value
+      ..speakingRate = googleSpeakingRate.value
+      ..pitch = googlePitch.value;
+  }
+
   Future<void> _speakCurrentChunk() async {
     if (!isSessionActive.value) return;
     if (_chunkIndex < 0 || _chunkIndex >= _chunks.length) {
@@ -388,8 +501,14 @@ class TtsService extends GetxService {
 
     sessionProgress.value = _chunks.isEmpty ? 0.0 : (_chunkIndex / _chunks.length).clamp(0.0, 1.0);
     final currentChunk = _chunks[_chunkIndex];
+    currentChunkText.value = currentChunk;
+    currentChunkIndex.value = _chunkIndex + 1;
+    currentChunkTotal.value = _chunks.length;
     _prefetchNextChunk();
     await _provider.speak(currentChunk);
+    if (_pauseRequested) {
+      await _provider.pause();
+    }
   }
 
   void _prefetchNextChunk() {
@@ -402,6 +521,11 @@ class TtsService extends GetxService {
     switch (event.type) {
       case TtsProviderEventType.started:
       case TtsProviderEventType.resumed:
+        if (_pauseRequested) {
+          isPlaying.value = false;
+          isPaused.value = true;
+          break;
+        }
         isPlaying.value = true;
         isPaused.value = false;
         break;
@@ -441,12 +565,27 @@ class TtsService extends GetxService {
     isSessionActive.value = false;
     isPlaying.value = false;
     isPaused.value = false;
+    _pauseRequested = false;
     _chunks = const [];
     _chunkIndex = 0;
+    currentChunkText.value = '';
+    currentChunkIndex.value = 0;
+    currentChunkTotal.value = 0;
     sessionProgress.value = 0.0;
   }
 
-  List<String> _splitToChunks(String text) {
+  int get _currentMaxChunkLen => isGoogleProvider ? _googleMaxChunkLen : _defaultMaxChunkLen;
+
+  String _sanitizeTextForTts(String text) {
+    return text
+        .replaceAllMapped(RegExp(r'⟪([^⧸⟫\s]+)⧸[^⟫\s。，！？；、,]*⟫'), (match) => match.group(1) ?? '')
+        .replaceAllMapped(RegExp(r'⟪([^⧸⟫\s]+)⧸[A-Za-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüńňǹḿ]+'), (match) => match.group(1) ?? '')
+        .replaceAll(RegExp(r'[⟪⟫⧸]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  List<String> _splitToChunks(String text, {required int maxChunkLen, int? maxSentenceLen}) {
     final normalized = text.replaceAll('\r\n', '\n').trim();
     if (normalized.isEmpty) return const [];
 
@@ -454,7 +593,7 @@ class TtsService extends GetxService {
     final chunks = <String>[];
 
     for (final paragraph in paragraphs.isEmpty ? [normalized] : paragraphs) {
-      final sentences = _splitByPriority(paragraph);
+      final sentences = _splitByPriority(paragraph, maxSentenceLen: maxSentenceLen);
       final buf = StringBuffer();
 
       for (final sentence in sentences) {
@@ -462,15 +601,15 @@ class TtsService extends GetxService {
         if (part.isEmpty) continue;
 
         if (buf.length == 0) {
-          if (part.length <= _maxChunkLen) {
+          if (part.length <= maxChunkLen) {
             buf.write(part);
           } else {
-            chunks.addAll(_splitHard(part));
+            chunks.addAll(_splitHard(part, maxChunkLen: maxChunkLen));
           }
           continue;
         }
 
-        if (buf.length + part.length <= _maxChunkLen) {
+        if (buf.length + part.length <= maxChunkLen) {
           buf.write(part);
         } else {
           final chunk = buf.toString().trim();
@@ -479,10 +618,10 @@ class TtsService extends GetxService {
           }
           buf.clear();
 
-          if (part.length <= _maxChunkLen) {
+          if (part.length <= maxChunkLen) {
             buf.write(part);
           } else {
-            chunks.addAll(_splitHard(part));
+            chunks.addAll(_splitHard(part, maxChunkLen: maxChunkLen));
           }
         }
       }
@@ -496,20 +635,48 @@ class TtsService extends GetxService {
     return chunks.where((e) => e.isNotEmpty).toList();
   }
 
-  List<String> _splitByPriority(String paragraph) {
-    final sentenceExp = RegExp(r'.+?(?:[。！？；!?;]+|$)', dotAll: true);
+  List<String> _splitByPriority(String paragraph, {int? maxSentenceLen}) {
+    final sentenceExp = RegExp(r'.+?(?:[。！？；!?;…]+|$)', dotAll: true);
     final matches = sentenceExp.allMatches(paragraph);
     final sentences = matches.map((m) => m.group(0)!.trim()).where((e) => e.isNotEmpty).toList();
-    return sentences.isEmpty ? [paragraph] : sentences;
+    final baseSentences = sentences.isEmpty ? [paragraph] : sentences;
+    if (maxSentenceLen == null) return baseSentences;
+    return baseSentences.expand((sentence) => _splitLongSentenceForGoogle(sentence, maxSentenceLen: maxSentenceLen)).toList();
   }
 
-  List<String> _splitHard(String text) {
+  List<String> _splitLongSentenceForGoogle(String sentence, {required int maxSentenceLen}) {
+    final trimmed = sentence.trim();
+    if (trimmed.length <= maxSentenceLen) return [trimmed];
+
+    final pieces = <String>[];
+    var remaining = trimmed;
+    while (remaining.length > maxSentenceLen) {
+      final candidate = remaining.substring(0, maxSentenceLen);
+      var splitIndex = _lastIndexOfAny(candidate, ['，', '、', ',', ' ']);
+      if (splitIndex <= maxSentenceLen ~/ 2) {
+        splitIndex = maxSentenceLen;
+      }
+      var piece = remaining.substring(0, splitIndex).trim();
+      if (piece.isNotEmpty && !RegExp(r'[。！？；!?;.]$').hasMatch(piece)) {
+        piece = "$piece. ";
+      }
+      pieces.add(piece);
+      remaining = remaining.substring(splitIndex).trimLeft();
+    }
+
+    if (remaining.isNotEmpty) {
+      pieces.add(remaining);
+    }
+    return pieces;
+  }
+
+  List<String> _splitHard(String text, {required int maxChunkLen}) {
     final pieces = <String>[];
     var remaining = text.trim();
 
-    while (remaining.length > _maxChunkLen) {
-      final candidate = remaining.substring(0, _maxChunkLen);
-      final splitIndex = _findSplitPoint(candidate);
+    while (remaining.length > maxChunkLen) {
+      final candidate = remaining.substring(0, maxChunkLen);
+      final splitIndex = _findSplitPoint(candidate, maxChunkLen: maxChunkLen);
       pieces.add(remaining.substring(0, splitIndex).trim());
       remaining = remaining.substring(splitIndex).trimLeft();
     }
@@ -520,15 +687,15 @@ class TtsService extends GetxService {
     return pieces;
   }
 
-  int _findSplitPoint(String text) {
+  int _findSplitPoint(String text, {required int maxChunkLen}) {
     final paragraphCut = _lastIndexOfAny(text, ['\n\n']);
-    if (paragraphCut > _maxChunkLen ~/ 2) return paragraphCut;
+    if (paragraphCut > maxChunkLen ~/ 2) return paragraphCut;
 
     final sentenceCut = _lastIndexOfAny(text, ['。', '！', '？', '；', '!', '?', ';']);
-    if (sentenceCut > _maxChunkLen ~/ 2) return sentenceCut;
+    if (sentenceCut > maxChunkLen ~/ 2) return sentenceCut;
 
     final softCut = _lastIndexOfAny(text, ['，', '、', ',', ' ']);
-    if (softCut > _maxChunkLen ~/ 2) return softCut;
+    if (softCut > maxChunkLen ~/ 2) return softCut;
 
     return text.length;
   }

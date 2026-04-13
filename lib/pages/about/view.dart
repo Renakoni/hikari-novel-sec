@@ -44,13 +44,7 @@ class AboutPage extends StatelessWidget {
             title: "Github",
             leading: const Icon(Icons.code),
             trailing: const Icon(Icons.open_in_new),
-            onTap: () => launchUrl(Uri.parse("https://github.com/15dd/hikari_novel_flutter")),
-          ),
-          NormalTile(
-            title: "Telegram",
-            leading: const Icon(Icons.group),
-            trailing: const Icon(Icons.open_in_new),
-            onTap: () => launchUrl(Uri.parse("https://t.me/+CUSABNkX5U83NGNl")),
+            onTap: () => launchUrl(Uri.parse("https://github.com/Renakoni/hikari-novel-sec")),
           ),
           Obx(
             () => Get.find<DevModeService>().enabled.value

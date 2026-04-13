@@ -43,6 +43,7 @@
 - 本地书移除、导入记录与缓存清理
 - 系统 TTS 听书
 - 火山引擎 TTS 实验支持
+- Google Cloud TTS 实验支持
 
 ## 本地 EPUB
 
@@ -71,8 +72,10 @@
 
 - 系统 TTS：调用 Android 系统的 Text-to-Speech 引擎，稳定性取决于手机系统和已安装的 TTS 引擎。
 - 火山引擎 TTS：实验功能，当前默认按豆包语音合成模型 1.0 接入，`Resource ID` 默认是 `seed-tts-1.0`。
+- Google Cloud TTS：实验功能，当前按 Cloud Text-to-Speech 接入，内置了一组 `cmn-CN-Chirp3-HD` 普通话音色。
 
 火山引擎模式目前内置了几个常用音色预设，设置页里可以直接选择，也保留了手动输入 `Speaker` 的方式。API Key、App ID 等参数需要用户自己在火山控制台获取和填写。
+Google 模式需要用户自己填写 Google Cloud TTS API Key。Google 的 `speakingRate` 和 `pitch` 使用独立参数，不和系统 TTS 的语速、音调范围混用。
 
 注意：
 

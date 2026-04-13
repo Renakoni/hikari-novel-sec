@@ -68,12 +68,7 @@ class _TtsFloatingControllerState extends State<TtsFloatingController> {
             Icon(Icons.record_voice_over_outlined, color: fg.withOpacity(0.75), size: 20),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                "listen_to_books".tr,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: kBaseTileSubtitleTextStyle.copyWith(color: fg),
-              ),
+              child: Text("listen_to_books".tr, maxLines: 1, overflow: TextOverflow.ellipsis, style: kBaseTileSubtitleTextStyle.copyWith(color: fg)),
             ),
             IconButton(
               tooltip: tts.isPlaying.value ? "pause".tr : "play".tr,

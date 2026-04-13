@@ -62,6 +62,11 @@ class LocalStorageService extends GetxService {
       kReaderTtsVolcengineAccessKey = "readerTtsVolcengineAccessKey",
       kReaderTtsVolcengineResourceId = "readerTtsVolcengineResourceId",
       kReaderTtsVolcengineSpeaker = "readerTtsVolcengineSpeaker",
+      kReaderTtsGoogleApiKey = "readerTtsGoogleApiKey",
+      kReaderTtsGoogleVoice = "readerTtsGoogleVoice",
+      kReaderTtsGoogleLanguageCode = "readerTtsGoogleLanguageCode",
+      kReaderTtsGoogleSpeakingRate = "readerTtsGoogleSpeakingRate",
+      kReaderTtsGooglePitch = "readerTtsGooglePitch",
       kReaderParaIndent = "readerParaIndent",
       kReaderParaSpacing = "readerParaSpacing",
       kReaderBottomStatusBarHorizontalSpacing = "readerBottomStatusBarHorizontalSpacing";
@@ -257,6 +262,26 @@ class LocalStorageService extends GetxService {
   String getReaderTtsVolcengineSpeaker() => _reader.get(kReaderTtsVolcengineSpeaker, defaultValue: "");
 
   void setReaderTtsVolcengineSpeaker(String value) => _reader.put(kReaderTtsVolcengineSpeaker, value);
+
+  String getReaderTtsGoogleApiKey() => _reader.get(kReaderTtsGoogleApiKey, defaultValue: "");
+
+  void setReaderTtsGoogleApiKey(String value) => _reader.put(kReaderTtsGoogleApiKey, value);
+
+  String getReaderTtsGoogleVoice() => _reader.get(kReaderTtsGoogleVoice, defaultValue: "");
+
+  void setReaderTtsGoogleVoice(String value) => _reader.put(kReaderTtsGoogleVoice, value);
+
+  String getReaderTtsGoogleLanguageCode() => _reader.get(kReaderTtsGoogleLanguageCode, defaultValue: "cmn-CN");
+
+  void setReaderTtsGoogleLanguageCode(String value) => _reader.put(kReaderTtsGoogleLanguageCode, value);
+
+  double getReaderTtsGoogleSpeakingRate() => _reader.get(kReaderTtsGoogleSpeakingRate, defaultValue: 1.0);
+
+  void setReaderTtsGoogleSpeakingRate(double value) => _reader.put(kReaderTtsGoogleSpeakingRate, value);
+
+  double getReaderTtsGooglePitch() => _reader.get(kReaderTtsGooglePitch, defaultValue: 0.0);
+
+  void setReaderTtsGooglePitch(double value) => _reader.put(kReaderTtsGooglePitch, value);
 
   bool getDevModeEnabled() => _setting.get(kDevModeEnabled, defaultValue: false);
 

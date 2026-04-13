@@ -319,6 +319,7 @@ class ReaderSettingPage extends StatelessWidget {
                   values: [
                     (TtsProviderType.system, tts.providerLabel(TtsProviderType.system)),
                     (TtsProviderType.volcengine, tts.providerLabel(TtsProviderType.volcengine)),
+                    (TtsProviderType.google, tts.providerLabel(TtsProviderType.google)),
                   ],
                   title: "听书来源",
                 ),
@@ -488,33 +489,108 @@ class ReaderSettingPage extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (tts.isGoogleProvider) ...[
+                  Obx(
+                    () => NormalTile(
+                      title: "Google API Key",
+                      subtitle: tts.googleApiKey.value.isEmpty ? "未填写" : _maskSecret(tts.googleApiKey.value),
+                      leading: const Icon(Icons.key_outlined),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: () => _editTextValue(
+                        context,
+                        title: "Google API Key",
+                        initialValue: tts.googleApiKey.value,
+                        obscureText: true,
+                        onSaved: tts.setGoogleApiKey,
+                      ),
+                    ),
+                  ),
+                  Obx(
+                    () => NormalTile(
+                      title: "Google 音色预设",
+                      subtitle: tts.googleVoiceLabel(tts.googleVoice.value),
+                      leading: const Icon(Icons.library_music_outlined),
+                      trailing: const Icon(Icons.keyboard_arrow_down),
+                      onTap: () {
+                        final values = TtsService.googleVoicePresets.map((preset) => (preset.voice, preset.label)).toList();
+                        Get.dialog(
+                          NormalListDialog(
+                            values: values,
+                            title: "Google 音色预设",
+                            subtitleBuilder: (context, index) => Text(TtsService.googleVoicePresets[index].gender),
+                          ),
+                        ).then((value) {
+                          if (value != null) {
+                            tts.setGoogleVoice(value);
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  Obx(
+                    () => NormalTile(
+                      title: "Google Voice",
+                      subtitle: tts.googleVoice.value.isEmpty ? "未填写" : "${tts.googleVoiceLabel(tts.googleVoice.value)}\n${tts.googleVoice.value}",
+                      leading: const Icon(Icons.record_voice_over_outlined),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: () => _editTextValue(
+                        context,
+                        title: "Google Voice",
+                        initialValue: tts.googleVoice.value,
+                        onSaved: tts.setGoogleVoice,
+                      ),
+                    ),
+                  ),
+                  Obx(
+                    () => SliderTile(
+                      title: "Google speakingRate",
+                      leading: const Icon(Icons.speed),
+                      min: 0.25,
+                      max: 2.0,
+                      divisions: 35,
+                      decimalPlaces: 2,
+                      value: tts.googleSpeakingRate.value,
+                      onChanged: (v) => tts.googleSpeakingRate.value = v,
+                      onChangeEnd: tts.setGoogleSpeakingRate,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    child: Text(
+                      "当前 Google TTS 模式使用 Cloud Text-to-Speech 的 cmn-CN Chirp3-HD 音色。Google 的 speakingRate 默认 1.0，和系统 TTS 的参数范围不同。Chirp3-HD 当前不支持 pitch 参数，所以这里不显示音调设置。",
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
                 const Divider(height: 1),
-                Obx(
-                  () => SliderTile(
-                    title: "speech_rate".tr,
-                    leading: const Icon(Icons.speed),
-                    min: 0.1,
-                    max: 1.0,
-                    divisions: 18,
-                    decimalPlaces: 1,
-                    value: tts.rate.value,
-                    onChanged: (v) => tts.rate.value = v,
-                    onChangeEnd: (v) => tts.setRate(v),
+                if (!tts.isGoogleProvider) ...[
+                  Obx(
+                    () => SliderTile(
+                      title: "speech_rate".tr,
+                      leading: const Icon(Icons.speed),
+                      min: 0.1,
+                      max: 1.0,
+                      divisions: 18,
+                      decimalPlaces: 1,
+                      value: tts.rate.value,
+                      onChanged: (v) => tts.rate.value = v,
+                      onChangeEnd: (v) => tts.setRate(v),
+                    ),
                   ),
-                ),
-                Obx(
-                  () => SliderTile(
-                    title: "tone".tr,
-                    leading: const Icon(Icons.graphic_eq),
-                    min: 0.5,
-                    max: 2.0,
-                    divisions: 15,
-                    decimalPlaces: 1,
-                    value: tts.pitch.value,
-                    onChanged: (v) => tts.pitch.value = v,
-                    onChangeEnd: (v) => tts.setPitch(v),
+                  Obx(
+                    () => SliderTile(
+                      title: "tone".tr,
+                      leading: const Icon(Icons.graphic_eq),
+                      min: 0.5,
+                      max: 2.0,
+                      divisions: 15,
+                      decimalPlaces: 1,
+                      value: tts.pitch.value,
+                      onChanged: (v) => tts.pitch.value = v,
+                      onChangeEnd: (v) => tts.setPitch(v),
+                    ),
                   ),
-                ),
+                ],
                 Obx(
                   () => SliderTile(
                     title: "volume".tr,
