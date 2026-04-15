@@ -46,6 +46,9 @@ MuMu 模拟器常用设备 ID：
 - 移除原作者 release 更新检查
 - TTS provider 架构初步完成
 - 系统 TTS / 火山引擎 TTS / Google TTS 三路可选
+- 听书支持当前章播完后自动进入下一章
+- 云端 TTS 音频缓存会在 App 冷启动时清理
+- 关于页 GitHub 已指向 `https://github.com/Renakoni/hikari-novel-sec`，Telegram 入口已删除
 
 ## 本地 EPUB 相关
 
@@ -209,28 +212,44 @@ Google 缓存：
 - 240 个文件
 - 约 160 MB
 
+缓存清理：
+
+- App 冷启动时会删除 `ApplicationSupportDirectory/tts_cache`
+- 只清理 TTS 音频缓存，不清理 EPUB、封面、章节缓存
+
+连续播放：
+
+- `TtsService` 暴露 `autoPlayNextChapter`，默认开启
+- 阅读器注册 `TtsService.onChapterCompleted`
+- 当前章 TTS chunk 播完后会调用阅读器切到下一章
+- 下一章内容加载成功后继续 `startChapter`
+- 最后一章播完后静默停止，不弹“没有下一章”
+- 设置入口：阅读设置的听书页，`连续播放下一章`
+
 ## 听书跟读定位
 
-目前刚做了最小闭环：
+当前状态：暂不保留。
 
-- `TtsService` 暴露：
-  - `currentChunkText`
-  - `currentChunkIndex`
-  - `currentChunkTotal`
-  - `sessionProgress`
-- 悬浮听书控制条会显示：
-  - `听书 x/y`
-  - 当前 chunk 的前一小段文本
-- 竖向阅读页尝试高亮当前 chunk 开头的一段文本
-- 阅读页会按 TTS session 进度自动跳转：
-  - 竖向：滚动到大致百分比
-  - 横向：跳到大致页码
+之前尝试过最小版：
 
-注意：
+- 悬浮控制条显示 `听书 x/y`
+- 竖向阅读页按当前 chunk 做段落高亮
+- 阅读页按 TTS session 进度粗略跳转
 
-- 这是粗粒度同步，不是逐字/逐句高亮。
-- 横向阅读目前只做自动翻页，未做页内高亮。
-- 竖向高亮依赖文本匹配，如果阅读器显示文本和 TTS 清洗后的文本不一致，可能匹配不到。
+但实际效果不稳定：
+
+- 只有少量段落能高亮
+- EPUB 清洗后的文本与阅读器显示文本不总是一致
+- 按百分比跳转无法准确对应正在播放的位置
+
+因此目前已经撤掉：
+
+- 阅读页不再接收 `highlightText`
+- 不再高亮当前播放段落
+- 不再按 TTS 进度自动跳转/翻页
+- 悬浮听书控制条不再显示 chunk 文本或 `x/y`
+
+后续如果重做，建议不要再做粗略字符串匹配，而是从章节解析阶段保留“文本位置 -> 渲染段落/页码”的稳定映射。
 
 ## 已知问题 / 风险
 
@@ -248,6 +267,7 @@ This request contains sentences that are too long.
   - 预取可以减少等待网络的停顿。
   - 但播放器切换 mp3 文件仍会有一点间隔。
   - 后续如果要继续优化，可以考虑 `just_audio` 播放队列。
+- 听书连续播放下一章是章节级续播，不做段落级定位。
 
 - Google / 火山 API Key 不应提交。
   - `tools/` 已加入 `.gitignore`
@@ -279,8 +299,8 @@ E:\flutter\bin\flutter.bat run -d 127.0.0.1:7555
 - Google TTS 播放停顿是否可接受
 - 火山 TTS 1.0 的 5 个预设是否正常
 - 听书悬浮控制条暂停 / 恢复状态是否同步
-- 竖向阅读是否能高亮当前播放段落
-- 横向阅读是否能按 TTS 进度自动翻页
+- 当前章播完后是否能自动进入下一章继续听书
+- 听书设置里的 `连续播放下一章` 开关是否生效
 
 3. 如果 Google 仍然停顿明显：
 

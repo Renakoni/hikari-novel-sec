@@ -27,4 +27,24 @@ class MyController extends GetxController {
       showSnackBar(message: "Import failed: $e", context: Get.context!);
     }
   }
+
+  Future<void> importMarkdown() async {
+    try {
+      final result = await LocalBookService.importMarkdown();
+      if (result == null) return;
+      showSnackBar(message: "Imported: ${result.title}", context: Get.context!);
+    } catch (e) {
+      showSnackBar(message: "Import failed: $e", context: Get.context!);
+    }
+  }
+
+  Future<void> importTxt() async {
+    try {
+      final result = await LocalBookService.importTxt();
+      if (result == null) return;
+      showSnackBar(message: "Imported: ${result.title}", context: Get.context!);
+    } catch (e) {
+      showSnackBar(message: "Import failed: $e", context: Get.context!);
+    }
+  }
 }

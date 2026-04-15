@@ -140,8 +140,7 @@ void showSnackBar({
 }) {
   // Create a SnackBar widget with specified properties
   var snack = SnackBar(
-    behavior: SnackBarBehavior.floating,
-    margin: const EdgeInsets.symmetric(vertical: 20, horizontal: 10), // Set margin around the SnackBar
+    behavior: SnackBarBehavior.fixed,
     duration: duration ?? const Duration(milliseconds: 4000), // Default duration if not provided
     content: Text(
       message, // Display the provided message text
@@ -149,8 +148,10 @@ void showSnackBar({
     ),
   );
 
-  // Hide any currently displayed SnackBar
-  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  // Clear the current SnackBar and any queued SnackBars before showing a new
+  // one. SnackBars use Hero internally, so queued/overlapping SnackBars can
+  // leave duplicate Hero tags during route transitions.
+  ScaffoldMessenger.of(context).clearSnackBars();
 
   // Show the created SnackBar
   ScaffoldMessenger.of(context).showSnackBar(snack);

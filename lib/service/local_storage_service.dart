@@ -58,6 +58,7 @@ class LocalStorageService extends GetxService {
       kDevModeEnabled = "devModeEnabled",
       kReaderTtsPitch = "readerTtsPitch",
       kReaderTtsVolume = "readerTtsVolume",
+      kReaderTtsAutoPlayNextChapter = "readerTtsAutoPlayNextChapter",
       kReaderTtsVolcengineAppId = "readerTtsVolcengineAppId",
       kReaderTtsVolcengineAccessKey = "readerTtsVolcengineAccessKey",
       kReaderTtsVolcengineResourceId = "readerTtsVolcengineResourceId",
@@ -67,6 +68,18 @@ class LocalStorageService extends GetxService {
       kReaderTtsGoogleLanguageCode = "readerTtsGoogleLanguageCode",
       kReaderTtsGoogleSpeakingRate = "readerTtsGoogleSpeakingRate",
       kReaderTtsGooglePitch = "readerTtsGooglePitch",
+      kAiAnalysisEnabled = "aiAnalysisEnabled",
+      kAiAnalysisProvider = "aiAnalysisProvider",
+      kAiAnalysisBaseUrl = "aiAnalysisBaseUrl",
+      kAiAnalysisApiKey = "aiAnalysisApiKey",
+      kAiAnalysisModel = "aiAnalysisModel",
+      kAiAnalysisTemperature = "aiAnalysisTemperature",
+      kAiAnalysisMaxTokens = "aiAnalysisMaxTokens",
+      kAiAnalysisMaxRequestTokens = "aiAnalysisMaxRequestTokens",
+      kAiAnalysisMaxResponseTokens = "aiAnalysisMaxResponseTokens",
+      kAiAnalysisSystemPrompt = "aiAnalysisSystemPrompt",
+      kAiAnalysisUserPromptTemplate = "aiAnalysisUserPromptTemplate",
+      kAiAnalysisMergeSystemPrompt = "aiAnalysisMergeSystemPrompt",
       kReaderParaIndent = "readerParaIndent",
       kReaderParaSpacing = "readerParaSpacing",
       kReaderBottomStatusBarHorizontalSpacing = "readerBottomStatusBarHorizontalSpacing";
@@ -247,6 +260,10 @@ class LocalStorageService extends GetxService {
 
   void setReaderTtsVolume(double value) => _reader.put(kReaderTtsVolume, value);
 
+  bool getReaderTtsAutoPlayNextChapter() => _reader.get(kReaderTtsAutoPlayNextChapter, defaultValue: true);
+
+  void setReaderTtsAutoPlayNextChapter(bool value) => _reader.put(kReaderTtsAutoPlayNextChapter, value);
+
   String getReaderTtsVolcengineAppId() => _reader.get(kReaderTtsVolcengineAppId, defaultValue: "");
 
   void setReaderTtsVolcengineAppId(String value) => _reader.put(kReaderTtsVolcengineAppId, value);
@@ -282,6 +299,65 @@ class LocalStorageService extends GetxService {
   double getReaderTtsGooglePitch() => _reader.get(kReaderTtsGooglePitch, defaultValue: 0.0);
 
   void setReaderTtsGooglePitch(double value) => _reader.put(kReaderTtsGooglePitch, value);
+
+  bool getAiAnalysisEnabled() => _reader.get(kAiAnalysisEnabled, defaultValue: false);
+
+  void setAiAnalysisEnabled(bool value) => _reader.put(kAiAnalysisEnabled, value);
+
+  String getAiAnalysisProvider() => _reader.get(kAiAnalysisProvider, defaultValue: "siliconflow");
+
+  void setAiAnalysisProvider(String value) => _reader.put(kAiAnalysisProvider, value);
+
+  String getAiAnalysisBaseUrl() => _reader.get(kAiAnalysisBaseUrl, defaultValue: "https://api.siliconflow.cn/v1");
+
+  void setAiAnalysisBaseUrl(String value) => _reader.put(kAiAnalysisBaseUrl, value);
+
+  String getAiAnalysisApiKey() => _reader.get(kAiAnalysisApiKey, defaultValue: "");
+
+  void setAiAnalysisApiKey(String value) => _reader.put(kAiAnalysisApiKey, value);
+
+  String getAiAnalysisModel() => _reader.get(kAiAnalysisModel, defaultValue: "Qwen/Qwen3-8B");
+
+  void setAiAnalysisModel(String value) => _reader.put(kAiAnalysisModel, value);
+
+  double getAiAnalysisTemperature() => _reader.get(kAiAnalysisTemperature, defaultValue: 0.2);
+
+  void setAiAnalysisTemperature(double value) => _reader.put(kAiAnalysisTemperature, value);
+
+  int getAiAnalysisMaxTokens() => _reader.get(kAiAnalysisMaxTokens, defaultValue: 1200);
+
+  void setAiAnalysisMaxTokens(int value) => _reader.put(kAiAnalysisMaxTokens, value);
+
+  int getAiAnalysisMaxRequestTokens() => _reader.get(kAiAnalysisMaxRequestTokens, defaultValue: 60000);
+
+  void setAiAnalysisMaxRequestTokens(int value) => _reader.put(kAiAnalysisMaxRequestTokens, value);
+
+  int getAiAnalysisMaxResponseTokens() {
+    if (_reader.containsKey(kAiAnalysisMaxResponseTokens)) {
+      return _reader.get(kAiAnalysisMaxResponseTokens, defaultValue: 30000);
+    }
+    if (_reader.containsKey(kAiAnalysisMaxTokens)) {
+      return getAiAnalysisMaxTokens();
+    }
+    return 30000;
+  }
+
+  void setAiAnalysisMaxResponseTokens(int value) {
+    _reader.put(kAiAnalysisMaxResponseTokens, value);
+    _reader.put(kAiAnalysisMaxTokens, value);
+  }
+
+  String getAiAnalysisSystemPrompt() => _reader.get(kAiAnalysisSystemPrompt, defaultValue: "");
+
+  void setAiAnalysisSystemPrompt(String value) => _reader.put(kAiAnalysisSystemPrompt, value);
+
+  String getAiAnalysisUserPromptTemplate() => _reader.get(kAiAnalysisUserPromptTemplate, defaultValue: "");
+
+  void setAiAnalysisUserPromptTemplate(String value) => _reader.put(kAiAnalysisUserPromptTemplate, value);
+
+  String getAiAnalysisMergeSystemPrompt() => _reader.get(kAiAnalysisMergeSystemPrompt, defaultValue: "");
+
+  void setAiAnalysisMergeSystemPrompt(String value) => _reader.put(kAiAnalysisMergeSystemPrompt, value);
 
   bool getDevModeEnabled() => _setting.get(kDevModeEnabled, defaultValue: false);
 

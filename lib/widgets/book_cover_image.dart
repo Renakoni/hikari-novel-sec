@@ -25,6 +25,8 @@ class BookCoverImage extends StatelessWidget {
 
   bool get _isLocalFile => imageUrl.isNotEmpty && !imageUrl.startsWith('http') && File(imageUrl).existsSync();
 
+  bool get _isRemoteFile => imageUrl.startsWith('http');
+
   @override
   Widget build(BuildContext context) {
     if (imageUrl.isEmpty) {
@@ -39,6 +41,10 @@ class BookCoverImage extends StatelessWidget {
         fit: fit,
         errorBuilder: (context, _, __) => _buildError(context, Exception("封面加载失败")),
       );
+    }
+
+    if (!_isRemoteFile) {
+      return _defaultPlaceholder(context);
     }
 
     return CachedNetworkImage(

@@ -33,6 +33,8 @@ migrate_working_dir/
 .pub/
 /build/
 /tools/
+LittleWhiteBox/
+docs/
 temp_epub_debug.dart
 
 # Symbolication related

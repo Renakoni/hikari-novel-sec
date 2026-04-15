@@ -5,23 +5,28 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hikari_novel_flutter/common/extension.dart';
 import 'package:hikari_novel_flutter/models/tts_provider_type.dart';
+import 'package:hikari_novel_flutter/service/ai/ai_analysis_service.dart';
 import 'package:hikari_novel_flutter/service/tts_service.dart';
 import 'package:hikari_novel_flutter/widgets/custom_tile.dart';
 import 'package:hikari_novel_flutter/widgets/state_page.dart';
 
 import '../../../models/dual_page_mode.dart';
 import '../../../models/reader_direction.dart';
+import 'ai_chapter_analysis_page.dart';
 import '../controller.dart';
 
 class ReaderSettingPage extends StatelessWidget {
-  ReaderSettingPage({super.key});
+  ReaderSettingPage({super.key, this.initialTabIndex = 0});
+
+  final int initialTabIndex;
 
   final ReaderController controller = Get.find();
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      initialIndex: initialTabIndex,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: Text("setting".tr),
@@ -31,11 +36,12 @@ class ReaderSettingPage extends StatelessWidget {
               Tab(icon: const Icon(Icons.settings_outlined), text: "basic".tr),
               Tab(icon: const Icon(Icons.palette_outlined), text: "theme".tr),
               Tab(icon: const Icon(Icons.record_voice_over_outlined), text: "listen_to_books".tr),
+              const Tab(icon: Icon(Icons.auto_awesome_outlined), text: "AI"),
               Tab(icon: const Icon(Icons.padding), text: "margin".tr),
             ],
           ),
         ),
-        body: TabBarView(children: [_buildBasic(context), _buildTheme(context), _buildListen(context), _buildPadding()]),
+        body: TabBarView(children: [_buildBasic(context), _buildTheme(context), _buildListen(context), _buildAiAnalysis(context), _buildPadding()]),
       ),
     );
   }
@@ -337,6 +343,14 @@ class ReaderSettingPage extends StatelessWidget {
             leading: const Icon(Icons.record_voice_over_outlined),
             onChanged: (v) => tts.setEnabled(v),
             value: tts.enabled.value,
+          ),
+        ),
+        Obx(
+          () => SwitchTile(
+            title: "连续播放下一章",
+            leading: const Icon(Icons.playlist_play_outlined),
+            onChanged: (v) => tts.setAutoPlayNextChapter(v),
+            value: tts.autoPlayNextChapter.value,
           ),
         ),
         Obx(
@@ -645,6 +659,8 @@ class ReaderSettingPage extends StatelessWidget {
     required String initialValue,
     required void Function(String value) onSaved,
     bool obscureText = false,
+    int minLines = 1,
+    int maxLines = 1,
   }) async {
     final controller = TextEditingController(text: initialValue);
     final result = await showDialog<String>(
@@ -655,6 +671,8 @@ class ReaderSettingPage extends StatelessWidget {
           controller: controller,
           autofocus: true,
           obscureText: obscureText,
+          minLines: minLines,
+          maxLines: maxLines,
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
             hintText: title,
@@ -675,6 +693,388 @@ class ReaderSettingPage extends StatelessWidget {
   String _maskSecret(String value) {
     if (value.length <= 8) return List.filled(value.length, "*").join();
     return "${value.substring(0, 4)}****${value.substring(value.length - 4)}";
+  }
+
+  String _previewText(String value, {int max = 60}) {
+    final text = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (text.isEmpty) return "未填写";
+    if (text.length <= max) return text;
+    return "${text.substring(0, max)}...";
+  }
+
+  Widget _buildAiAnalysis(BuildContext context) {
+    final ai = AiAnalysisService.instance;
+    final supported = ai.supportsAid(controller.aid);
+    return ListView(
+      children: [
+        if (!supported)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Text(
+              "当前仅对网络小说和本地 EPUB 启用 AI 分析，Markdown/TXT 暂不开放。",
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        Obx(
+          () => SwitchTile(
+            title: "启用 AI 分析",
+            leading: const Icon(Icons.auto_awesome_outlined),
+            onChanged: ai.setEnabled,
+            value: ai.enabled.value,
+          ),
+        ),
+        Obx(
+          () => NormalTile(
+            title: "Provider",
+            subtitle: ai.provider.value,
+            leading: const Icon(Icons.hub_outlined),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => _editTextValue(
+              context,
+              title: "Provider",
+              initialValue: ai.provider.value,
+              onSaved: ai.setProvider,
+            ),
+          ),
+        ),
+        Obx(
+          () => NormalTile(
+            title: "Base URL",
+            subtitle: ai.baseUrl.value.isEmpty ? "未填写" : ai.baseUrl.value,
+            leading: const Icon(Icons.link_outlined),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => _editTextValue(
+              context,
+              title: "Base URL",
+              initialValue: ai.baseUrl.value,
+              onSaved: ai.setBaseUrl,
+            ),
+          ),
+        ),
+        Obx(
+          () => NormalTile(
+            title: "API Key",
+            subtitle: ai.apiKey.value.isEmpty ? "未填写" : _maskSecret(ai.apiKey.value),
+            leading: const Icon(Icons.key_outlined),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => _editTextValue(
+              context,
+              title: "API Key",
+              initialValue: ai.apiKey.value,
+              obscureText: true,
+              onSaved: ai.setApiKey,
+            ),
+          ),
+        ),
+        Obx(
+          () => NormalTile(
+            title: "Model",
+            subtitle: ai.model.value.isEmpty ? "未填写" : ai.model.value,
+            leading: const Icon(Icons.smart_toy_outlined),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => _editTextValue(
+              context,
+              title: "Model",
+              initialValue: ai.model.value,
+              onSaved: ai.setModel,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Row(
+            children: [
+              Expanded(
+                  child: OutlinedButton.icon(
+                  onPressed: supported
+                      ? () async {
+                    try {
+                      final models = await ai.fetchModels();
+                      if (models.isEmpty) {
+                        showSnackBar(message: "没有拉取到模型，当前供应商可能不支持 /models", context: context);
+                        return;
+                      }
+                      if (!context.mounted) return;
+                      Get.dialog(
+                        NormalListDialog(
+                          values: models.map((model) => (model, model)).toList(),
+                          title: "选择模型",
+                        ),
+                      ).then((value) {
+                        if (value != null) ai.setModel(value);
+                      });
+                    } catch (e) {
+                      showSnackBar(message: "拉取模型失败: $e", context: context);
+                    }
+                  }
+                      : null,
+                  icon: const Icon(Icons.download_outlined),
+                  label: const Text("拉取模型"),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: supported
+                      ? () async {
+                    try {
+                      await ai.testConnection();
+                      showSnackBar(message: "AI 连接成功", context: context);
+                    } catch (e) {
+                      showSnackBar(message: "AI 连接失败: $e", context: context);
+                    }
+                  }
+                      : null,
+                  icon: const Icon(Icons.network_check_outlined),
+                  label: const Text("测试连接"),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Obx(
+          () => SliderTile(
+            title: "Temperature",
+            leading: const Icon(Icons.thermostat_outlined),
+            min: 0,
+            max: 2,
+            divisions: 20,
+            decimalPlaces: 1,
+            value: ai.temperature.value,
+            onChanged: (v) => ai.temperature.value = v,
+            onChangeEnd: ai.setTemperature,
+          ),
+        ),
+        Obx(
+          () => SliderTile(
+            title: "最大请求 Tokens",
+            leading: const Icon(Icons.format_list_numbered_outlined),
+            min: 2000,
+            max: 60000,
+            divisions: 58,
+            decimalPlaces: 0,
+            value: ai.maxRequestTokens.value.toDouble(),
+            onChanged: (v) => ai.maxRequestTokens.value = v.toInt(),
+            onChangeEnd: (v) => ai.setMaxRequestTokens(v.toInt()),
+          ),
+        ),
+        Obx(
+          () => SliderTile(
+            title: "最大回复 Tokens",
+            leading: const Icon(Icons.short_text_outlined),
+            min: 256,
+            max: 30000,
+            divisions: 58,
+            decimalPlaces: 0,
+            value: ai.maxTokens.value.toDouble(),
+            onChanged: (v) => ai.maxTokens.value = v.toInt(),
+            onChangeEnd: (v) => ai.setMaxTokens(v.toInt()),
+          ),
+        ),
+        Obx(
+          () => NormalTile(
+            title: "系统提示词",
+            subtitle: _previewText(ai.effectiveSystemPrompt),
+            leading: const Icon(Icons.description_outlined),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => _editTextValue(
+              context,
+              title: "系统提示词",
+              initialValue: ai.effectiveSystemPrompt,
+              minLines: 12,
+              maxLines: 18,
+              onSaved: ai.setSystemPrompt,
+            ),
+          ),
+        ),
+        Obx(
+          () => NormalTile(
+            title: "用户提示词模板",
+            subtitle: _previewText(ai.effectiveUserPromptTemplate),
+            leading: const Icon(Icons.article_outlined),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => _editTextValue(
+              context,
+              title: "用户提示词模板",
+              initialValue: ai.effectiveUserPromptTemplate,
+              minLines: 12,
+              maxLines: 18,
+              onSaved: ai.setUserPromptTemplate,
+            ),
+          ),
+        ),
+        Obx(
+          () => NormalTile(
+            title: "合并阶段系统提示词",
+            subtitle: _previewText(ai.effectiveMergeSystemPrompt),
+            leading: const Icon(Icons.merge_type_outlined),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => _editTextValue(
+              context,
+              title: "合并阶段系统提示词",
+              initialValue: ai.effectiveMergeSystemPrompt,
+              minLines: 12,
+              maxLines: 18,
+              onSaved: ai.setMergeSystemPrompt,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: ai.resetPrompts,
+              icon: const Icon(Icons.restart_alt_outlined),
+              label: const Text("恢复默认提示词"),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final text = controller.text.value.trim();
+                final recentSummary = await ai.getRecentSummaryPreview(controller.aid, excludeCid: controller.cid);
+                final bookMemory = await ai.getBookMemoryPreview(controller.aid);
+                final preview = ai.renderUserPrompt(
+                  chapterTitle: controller.chapterTitle.value,
+                  chapterText: text.isEmpty ? "{{chapterText}}" : text,
+                  recentSummary: recentSummary,
+                  bookMemory: bookMemory,
+                );
+                await showDialog<void>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text("当前用户 Prompt 预览"),
+                    content: SizedBox(
+                      width: double.maxFinite,
+                      child: SingleChildScrollView(child: SelectableText(preview)),
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text("confirm".tr)),
+                    ],
+                  ),
+                );
+              },
+              icon: const Icon(Icons.preview_outlined),
+              label: const Text("预览当前用户 Prompt"),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                try {
+                  final preview = await ai.renderMergePromptPreview(
+                    aid: controller.aid,
+                    cid: controller.cid,
+                    chapterTitle: controller.chapterTitle.value,
+                  );
+                  if (!context.mounted) return;
+                  await showDialog<void>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text("合并阶段 Prompt 预览"),
+                      content: SizedBox(
+                        width: double.maxFinite,
+                        child: SingleChildScrollView(child: SelectableText(preview)),
+                      ),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text("confirm".tr)),
+                      ],
+                    ),
+                  );
+                } catch (e) {
+                  showSnackBar(message: "请先分析当前章节，再预览合并阶段 Prompt", context: context);
+                }
+              },
+              icon: const Icon(Icons.merge_outlined),
+              label: const Text("预览合并阶段 Prompt"),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Text(
+            "支持占位符：{{chapterTitle}} {{chapterText}} {{recentSummary}} {{bookMemory}}。第一阶段负责章节抽取，第二阶段会带上已知人物和关系做合并。",
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: supported ? () => _analyzeCurrentChapter(context) : null,
+              icon: const Icon(Icons.account_tree_outlined),
+              label: const Text("分析当前章节"),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: supported ? () => _showCurrentChapterAnalysis(context) : null,
+              icon: const Icon(Icons.visibility_outlined),
+              label: const Text("查看当前章节分析结果"),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Future<void> _analyzeCurrentChapter(BuildContext context) async {
+    final ai = AiAnalysisService.instance;
+    final text = controller.text.value;
+    if (text.trim().isEmpty) {
+      showSnackBar(message: "当前章节还在加载中", context: context);
+      return;
+    }
+
+    showSnackBar(
+      message: "正在分析当前章节...",
+      context: context,
+      duration: const Duration(days: 1),
+    );
+    try {
+      final result = await ai.analyzeChapter(
+        aid: controller.aid,
+        cid: controller.cid,
+        chapterTitle: controller.chapterTitle.value,
+        chapterText: text,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      await Get.to(() => AiChapterAnalysisPage(result: result));
+    } catch (e) {
+      showSnackBar(message: "AI 分析失败: $e", context: context);
+    }
+  }
+
+  Future<void> _showCurrentChapterAnalysis(BuildContext context) async {
+    final ai = AiAnalysisService.instance;
+    try {
+      final result = await ai.loadAnalysis(aid: controller.aid, cid: controller.cid);
+      if (result == null) {
+        final path = await ai.analysisPath(aid: controller.aid, cid: controller.cid);
+        showSnackBar(message: "当前章节还没有分析结果: $path", context: context);
+        return;
+      }
+      if (!context.mounted) return;
+      await Get.to(() => AiChapterAnalysisPage(result: result));
+    } catch (e) {
+      showSnackBar(message: "读取 AI 分析结果失败: $e", context: context);
+    }
   }
 
   Widget _buildPadding() {

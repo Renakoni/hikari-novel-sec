@@ -80,9 +80,8 @@ class _TtsFloatingControllerState extends State<TtsFloatingController> {
                   await tts.resumeSession();
                 } else {
                   final text = reader.text.value;
-                  final cleaned = text.replaceAll(RegExp(r'\s+'), ' ').trim();
-                  if (cleaned.isNotEmpty) {
-                    await tts.startChapter(cleaned);
+                  if (text.trim().isNotEmpty) {
+                    await tts.startChapter(text);
                   }
                 }
               },

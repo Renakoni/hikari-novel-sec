@@ -20,6 +20,7 @@ import '../../models/dual_page_mode.dart';
 import '../../models/page_state.dart';
 import '../../models/resource.dart';
 import '../../network/api.dart';
+import '../../service/ai/ai_analysis_service.dart';
 import '../../service/db_service.dart';
 import '../../service/local_book_service.dart';
 import '../../service/local_storage_service.dart';
@@ -504,6 +505,19 @@ class NovelDetailController extends GetxController with GetSingleTickerProviderS
   }
 
   void deleteAllReadHistory() async => DBService.instance.deleteAllReadHistory();
+
+  Future<void> clearAiAnalysisCache() async {
+    try {
+      await AiAnalysisService.instance.clearBookAnalysis(aid);
+      if (Get.context != null) {
+        showSnackBar(message: "已清除本书 AI 缓存", context: Get.context!);
+      }
+    } catch (e) {
+      if (Get.context != null) {
+        showSnackBar(message: "清除 AI 缓存失败: $e", context: Get.context!);
+      }
+    }
+  }
 
   Future<void> markAsUnRead() async {
     for (var chapter in getSelectedChapters()) {

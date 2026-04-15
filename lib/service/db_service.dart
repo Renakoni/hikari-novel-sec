@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
 
 import '../common/database/database.dart';
+import 'ai/ai_analysis_models.dart';
+import 'ai/ai_memory_models.dart';
 
 class DBService extends GetxService {
   static DBService get instance => Get.find<DBService>();
@@ -9,6 +11,7 @@ class DBService extends GetxService {
 
   void init() {
     _db = AppDatabase();
+    _db.ensureAiAnalysisTables();
   }
 
   Future<void> insertAllBookshelf(Iterable<BookshelfEntityData> data) => _db.insertAllBookshelf(data);
@@ -66,4 +69,124 @@ class DBService extends GetxService {
   Future<void> deleteNovelDetail(String aid) => _db.deleteNovelDetail(aid);
 
   Future<void> deleteAllNovelDetail() => _db.deleteAllNovelDetail();
+
+  Future<void> ensureAiAnalysisTables() => _db.ensureAiAnalysisTables();
+
+  Future<void> upsertAiBook({
+    required String aid,
+    required String title,
+    required String sourceType,
+    required String? lastAnalyzedCid,
+    required DateTime? lastAnalyzedAt,
+    required String latestBookSummary,
+    required String latestArcSummary,
+    required int characterCount,
+    required int relationCount,
+  }) => _db.upsertAiBook(
+        aid: aid,
+        title: title,
+        sourceType: sourceType,
+        lastAnalyzedCid: lastAnalyzedCid,
+        lastAnalyzedAt: lastAnalyzedAt,
+        latestBookSummary: latestBookSummary,
+        latestArcSummary: latestArcSummary,
+        characterCount: characterCount,
+        relationCount: relationCount,
+      );
+
+  Future<void> upsertAiChapterAnalysis({
+    required String aid,
+    required String cid,
+    required String chapterTitle,
+    required ChapterAnalysisResult result,
+    required int promptVersion,
+    required int maxRequestTokens,
+    required int maxResponseTokens,
+    required String snapshotJsonPath,
+  }) => _db.upsertAiChapterAnalysis(
+        aid: aid,
+        cid: cid,
+        chapterTitle: chapterTitle,
+        result: result,
+        promptVersion: promptVersion,
+        maxRequestTokens: maxRequestTokens,
+        maxResponseTokens: maxResponseTokens,
+        snapshotJsonPath: snapshotJsonPath,
+      );
+
+  Future<AiChapterAnalysisRecord?> getAiChapterAnalysis(String aid, String cid) => _db.getAiChapterAnalysis(aid, cid);
+
+  Future<List<AiBookRecord>> getAiBooks() => _db.getAiBooks();
+
+  Future<AiBookRecord?> getAiBook(String aid) => _db.getAiBook(aid);
+
+  Future<void> deleteAiAnalysisByAid(String aid) => _db.deleteAiAnalysisByAid(aid);
+
+  Future<void> upsertAiMemoryRow({
+    required String aid,
+    required String rowType,
+    required String rowKey,
+    required String timeSpan,
+    required String content,
+    required String refCid,
+    required int orderNo,
+  }) => _db.upsertAiMemoryRow(
+        aid: aid,
+        rowType: rowType,
+        rowKey: rowKey,
+        timeSpan: timeSpan,
+        content: content,
+        refCid: refCid,
+        orderNo: orderNo,
+      );
+
+  Future<List<AiMemoryRowRecord>> getAiMemoryRows(String aid, {String? rowType}) => _db.getAiMemoryRows(aid, rowType: rowType);
+
+  Future<void> upsertAiCharacterState({
+    required String aid,
+    required String name,
+    required String aliasesJson,
+    required String profileSummary,
+    required String firstSeenCid,
+    required String lastSeenCid,
+    required int appearanceCount,
+    required String tier,
+    required int importanceScore,
+  }) => _db.upsertAiCharacterState(
+        aid: aid,
+        name: name,
+        aliasesJson: aliasesJson,
+        profileSummary: profileSummary,
+        firstSeenCid: firstSeenCid,
+        lastSeenCid: lastSeenCid,
+        appearanceCount: appearanceCount,
+        tier: tier,
+        importanceScore: importanceScore,
+      );
+
+  Future<void> upsertAiRelationState({
+    required String aid,
+    required String fromName,
+    required String toName,
+    required String relationLabel,
+    required String relationSummary,
+    required String firstSeenCid,
+    required String lastSeenCid,
+    required int mentionCount,
+    required int strengthScore,
+  }) => _db.upsertAiRelationState(
+        aid: aid,
+        fromName: fromName,
+        toName: toName,
+        relationLabel: relationLabel,
+        relationSummary: relationSummary,
+        firstSeenCid: firstSeenCid,
+        lastSeenCid: lastSeenCid,
+        mentionCount: mentionCount,
+        strengthScore: strengthScore,
+      );
+
+  Future<List<AiCharacterStateRecord>> getAiCharacterStates(String aid) => _db.getAiCharacterStates(aid);
+
+  Future<List<AiRelationStateRecord>> getAiRelationStates(String aid) => _db.getAiRelationStates(aid);
 }

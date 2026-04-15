@@ -199,6 +199,7 @@ class VerticalReadPageState extends State<VerticalReadPage> {
 
   Widget _buildImage(String url, int index) {
     final isLocalFile = !url.startsWith('http') && File(url).existsSync();
+    final isRemoteFile = url.startsWith('http');
     return RepaintBoundary(
       child: Padding(
         padding: const EdgeInsets.only(bottom: 20),
@@ -212,31 +213,67 @@ class VerticalReadPageState extends State<VerticalReadPage> {
                   fit: BoxFit.fitWidth,
                   errorBuilder: (context, _, __) => const Column(children: [Icon(Icons.error_outline)]),
                 )
-              : CachedNetworkImage(
-                  width: double.infinity,
-                  imageUrl: url,
-                  httpHeaders: Request.userAgent,
-                  fit: BoxFit.fitWidth,
-                  progressIndicatorBuilder: (context, url, progress) => Center(child: CircularProgressIndicator(value: progress.progress)),
-                  errorWidget: (context, url, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
-                ),
+              : isRemoteFile
+                  ? CachedNetworkImage(
+                      width: double.infinity,
+                      imageUrl: url,
+                      httpHeaders: Request.userAgent,
+                      fit: BoxFit.fitWidth,
+                      progressIndicatorBuilder: (context, url, progress) => Center(child: CircularProgressIndicator(value: progress.progress)),
+                      errorWidget: (context, url, error) => Column(children: [const Icon(Icons.error_outline), Text(error.toString())]),
+                    )
+                  : const Column(children: [Icon(Icons.broken_image_outlined)]),
         ),
       ),
     );
   }
 
   void _splitItems() {
+    const maxTextBlockLength = 2400;
     final paragraphs = widget.text.split('\n\n').where((e) => e.trim().isNotEmpty);
 
     _items = [];
 
     for (var para in paragraphs) {
-      _items.add(ReaderItem.text(para.trimLeft()));
+      for (final block in _splitLargeTextBlock(para.trimLeft(), maxTextBlockLength)) {
+        if (block.trim().isNotEmpty) {
+          _items.add(ReaderItem.text(block));
+        }
+      }
     }
 
     for (int i = 0; i < widget.images.length; i++) {
       _items.add(ReaderItem.image(widget.images[i], i));
     }
+  }
+
+  List<String> _splitLargeTextBlock(String text, int maxLength) {
+    if (text.length <= maxLength) return [text];
+
+    final blocks = <String>[];
+    final buffer = StringBuffer();
+    for (final line in text.split('\n')) {
+      if (buffer.isNotEmpty && buffer.length + line.length + 1 > maxLength) {
+        blocks.add(buffer.toString());
+        buffer.clear();
+      }
+      if (line.length <= maxLength) {
+        if (buffer.isNotEmpty) buffer.write('\n');
+        buffer.write(line);
+        continue;
+      }
+
+      if (buffer.isNotEmpty) {
+        blocks.add(buffer.toString());
+        buffer.clear();
+      }
+      for (var start = 0; start < line.length; start += maxLength) {
+        final end = (start + maxLength) > line.length ? line.length : start + maxLength;
+        blocks.add(line.substring(start, end));
+      }
+    }
+    if (buffer.isNotEmpty) blocks.add(buffer.toString());
+    return blocks;
   }
 
   //排版几何参数的签名

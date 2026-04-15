@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -85,8 +86,14 @@ class VolcengineTtsProvider extends TtsProvider {
       final audioPath = await _ensureAudioFile(cleaned);
       await _player.setFilePath(audioPath);
       await _player.setVolume(_volume.clamp(0.0, 1.0));
-      await _player.play();
+      final playFuture = _player.play();
       emit(const TtsProviderEvent(TtsProviderEventType.started));
+      unawaited(
+        playFuture.catchError((Object e, StackTrace stackTrace) {
+          Log.d("[VolcengineTtsProvider] playback failed: $e");
+          emit(TtsProviderEvent(TtsProviderEventType.error, message: e.toString()));
+        }),
+      );
     } catch (e) {
       Log.d("[VolcengineTtsProvider] speak failed: $e");
       emit(TtsProviderEvent(TtsProviderEventType.error, message: e.toString()));

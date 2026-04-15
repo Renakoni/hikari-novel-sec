@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:get/get.dart';
 import 'package:hikari_novel_flutter/models/common/wenku8_node.dart';
 import 'package:hikari_novel_flutter/models/novel_detail.dart';
@@ -517,10 +519,10 @@ class Parser {
     for (var img in imgElements) {
       String? src = img.attributes['src'] ?? img.attributes['xlink:href'] ?? img.attributes['href'];
       if (src != null && src.isNotEmpty) {
-        final normalized = src.startsWith('http') || src.contains(':\\') || src.startsWith('/')
-            ? ImageUrlHelper.normalize(src)
-            : src;
-        imgSrcList.add(normalized);
+        final normalized = _normalizeContentImageSrc(src);
+        if (normalized.isNotEmpty) {
+          imgSrcList.add(normalized);
+        }
       }
     }
 
@@ -556,5 +558,24 @@ class Parser {
     }
 
     return Content(text: finalText, images: imgSrcList);
+  }
+
+  static String _normalizeContentImageSrc(String src) {
+    final value = src.trim();
+    if (value.isEmpty) return value;
+    if (_isExistingLocalFilePath(value)) return value;
+    if (value.startsWith('http') || value.startsWith('//') || value.startsWith('/')) {
+      return ImageUrlHelper.normalize(value);
+    }
+    return '';
+  }
+
+  static bool _isExistingLocalFilePath(String src) {
+    if (!src.contains(':\\') && !src.startsWith('/')) return false;
+    try {
+      return File(src).existsSync();
+    } catch (_) {
+      return false;
+    }
   }
 }

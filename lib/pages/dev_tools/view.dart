@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:hikari_novel_flutter/widgets/custom_tile.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../common/ai_debug_logger.dart';
 import '../../service/dev_mode_service.dart';
 import '../../widgets/state_page.dart';
 
@@ -23,6 +24,8 @@ class DevToolsPage extends StatelessWidget {
     final dir = await _appDir();
     return File('${dir.path}/html_debug.txt');
   }
+
+  Future<File> _aiLogFile() => AiDebugLogger.logFile();
 
   Future<Directory> _dumpDir() async {
     final dir = await _appDir();
@@ -55,6 +58,26 @@ class DevToolsPage extends StatelessWidget {
       await file.writeAsString('', flush: true);
     }
     showSnackBar(message: "日志已清空", context: Get.context!);
+  }
+
+  Future<void> _clearAiLog() async {
+    await AiDebugLogger.clearLog();
+    showSnackBar(message: "AI 日志已清空", context: Get.context!);
+  }
+
+  Future<void> _showAiLog() async {
+    final content = await AiDebugLogger.readLog();
+    await showDialog(
+      context: Get.context!,
+      builder: (_) => AlertDialog(
+        title: const Text('hikari_ai_debug.txt'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(child: SelectableText(content.isEmpty ? '暂无内容' : content)),
+        ),
+        actions: [TextButton(onPressed: Get.back, child: Text("confirm".tr))],
+      ),
+    );
   }
 
   Future<List<FileSystemEntity>> _listDumps() async {
@@ -136,18 +159,40 @@ class DevToolsPage extends StatelessWidget {
           ),
           NormalTile(title: "清空 html_debug.txt", leading: const Icon(Icons.clear_all), onTap: _clearLog),
           const Divider(height: 1),
+          NormalTile(
+            title: "查看 hikari_ai_debug.txt",
+            subtitle: "仅记录 AI 配置、拉取模型、请求摘要和响应预览，API Key 会脱敏",
+            leading: const Icon(Icons.auto_awesome_outlined),
+            onTap: _showAiLog,
+          ),
+          NormalTile(title: "清空 hikari_ai_debug.txt", leading: const Icon(Icons.clear_all), onTap: _clearAiLog),
+          const Divider(height: 1),
           NormalTile(title: "查看 HTML dumps", subtitle: "完整 HTML（用于 MT 直接分析）", leading: const Icon(Icons.remove_red_eye_outlined), onTap: _showDumps),
           NormalTile(title: "清空 HTML dumps", leading: const Icon(Icons.clear_all), onTap: _clearDumps),
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.all(16),
-            child: FutureBuilder<Directory>(
-              future: _appDir(),
-              builder: (_, snap) {
-                final path = snap.data?.path ?? '';
-                final s = path.isEmpty ? '路径加载中…' : '本地目录:\n$path\n\nMT 查看：Android/data/<package>/files/\n- html_debug.txt\n- html_dumps/';
-                return Text(s, style: const TextStyle(fontSize: 12));
-              },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FutureBuilder<Directory>(
+                  future: _appDir(),
+                  builder: (_, snap) {
+                    final path = snap.data?.path ?? '';
+                    final s = path.isEmpty ? '本地目录加载中…' : '本地目录:\n$path\n\nMT 查看：Android/data/<package>/files/\n- html_debug.txt\n- html_dumps/';
+                    return Text(s, style: const TextStyle(fontSize: 12));
+                  },
+                ),
+                const SizedBox(height: 12),
+                FutureBuilder<File>(
+                  future: _aiLogFile(),
+                  builder: (_, snap) {
+                    final path = snap.data?.path ?? '';
+                    final s = path.isEmpty ? 'AI 日志路径加载中…' : 'AI 日志:\n$path';
+                    return Text(s, style: const TextStyle(fontSize: 12));
+                  },
+                ),
+              ],
             ),
           ),
         ],

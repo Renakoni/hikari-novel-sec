@@ -17,9 +17,19 @@ import 'db_service.dart';
 
 class LocalBookService {
   static const String epubAidPrefix = "local_epub_";
+  static const String markdownAidPrefix = "local_md_";
+  static const String txtAidPrefix = "local_txt_";
   static const String localUrlPrefix = "local://epub/";
 
-  static bool isLocalAid(String aid) => aid.startsWith(epubAidPrefix);
+  static bool isLocalAid(String aid) => aid.startsWith(epubAidPrefix) || aid.startsWith(markdownAidPrefix) || aid.startsWith(txtAidPrefix);
+
+  static bool isEpubAid(String aid) => aid.startsWith(epubAidPrefix);
+
+  static bool isMarkdownAid(String aid) => aid.startsWith(markdownAidPrefix);
+
+  static bool isTxtAid(String aid) => aid.startsWith(txtAidPrefix);
+
+  static bool supportsAiAnalysis(String aid) => !isLocalAid(aid) || isEpubAid(aid);
 
   static bool isLocalBookshelfEntry(BookshelfEntityData data) => isLocalAid(data.aid);
 
@@ -176,6 +186,85 @@ class LocalBookService {
     );
 
     return LocalImportResult(aid: aid, title: title);
+  }
+
+  static Future<LocalImportResult?> importMarkdown() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['md', 'markdown']);
+    if (result == null || result.files.single.path == null) return null;
+
+    final sourcePath = result.files.single.path!;
+    final sourceFile = File(sourcePath);
+    final title = path.basenameWithoutExtension(sourcePath);
+    final aid = "$markdownAidPrefix${DateTime.now().millisecondsSinceEpoch}";
+
+    final appDir = await getApplicationSupportDirectory();
+    final importedBookDir = Directory(path.join(appDir.path, 'imported_books', aid));
+    final contentImageDir = Directory(path.join(importedBookDir.path, 'content_images'));
+    final chapterCacheDir = Directory(path.join(appDir.path, 'cached_chapter'));
+    await importedBookDir.create(recursive: true);
+    await contentImageDir.create(recursive: true);
+    await chapterCacheDir.create(recursive: true);
+
+    final rawMarkdown = await sourceFile.readAsString();
+    final markdownContent = await _rewriteMarkdownImageReferences(
+      rawMarkdown,
+      sourceDir: path.dirname(sourcePath),
+      contentImageDir: contentImageDir,
+    );
+    await File(path.join(importedBookDir.path, 'source.md')).writeAsString(markdownContent, flush: true);
+
+    final cid = "${aid}_chapter_0";
+    await File(path.join(chapterCacheDir.path, "${aid}_$cid.txt")).writeAsString('<div id="content">${_plainTextToHtml(markdownContent)}</div>');
+
+    final detail = NovelDetail(
+      title,
+      "Local Import",
+      "Local Markdown",
+      DateTime.now().toIso8601String().split('T').first,
+      "",
+      "Imported Markdown",
+      const ["Local", "Markdown"],
+      [],
+      "Imported",
+      "Local Reading",
+      false,
+    )..catalogue = [
+        CatVolume(
+          title: "Content",
+          chapters: [CatChapter(title: title, cid: cid)],
+        )
+      ];
+
+    await DBService.instance.upsertNovelDetail(NovelDetailEntityData(aid: aid, json: jsonEncode(detail.toJson())));
+    await DBService.instance.upsertBookshelf(
+      BookshelfEntityData(
+        aid: aid,
+        bid: aid,
+        url: "$localUrlPrefix$aid",
+        title: title,
+        img: "",
+        classId: "0",
+      ),
+    );
+
+    return LocalImportResult(aid: aid, title: title);
+  }
+
+  static Future<LocalImportResult?> importTxt() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['txt']);
+    if (result == null || result.files.single.path == null) return null;
+
+    final sourcePath = result.files.single.path!;
+    final rawText = utf8.decode(await File(sourcePath).readAsBytes(), allowMalformed: true);
+    return _importSingleChapterTextBook(
+      sourcePath: sourcePath,
+      sourceFileName: 'source.txt',
+      aidPrefix: txtAidPrefix,
+      status: "Local TXT",
+      description: "Imported TXT",
+      tags: const ["Local", "TXT"],
+      bodyHtml: _plainTextPreservingLineBreaksToHtml(rawText),
+    );
   }
 
   static Future<void> removeFromBookshelf(String aid) async {
@@ -360,6 +449,249 @@ class LocalBookService {
       await File(savedPath).writeAsBytes(bytes, flush: true);
     }
     return savedPath;
+  }
+
+  static Future<String> loadMarkdownSource(String aid) async {
+    if (!isMarkdownAid(aid)) return '';
+    final appDir = await getApplicationSupportDirectory();
+    final file = File(path.join(appDir.path, 'imported_books', aid, 'source.md'));
+    if (!await file.exists()) return '';
+    return await file.readAsString();
+  }
+
+  static Future<String> loadTxtSource(String aid) async {
+    if (!isTxtAid(aid)) return '';
+    final appDir = await getApplicationSupportDirectory();
+    final file = File(path.join(appDir.path, 'imported_books', aid, 'source.txt'));
+    if (!await file.exists()) return '';
+    return utf8.decode(await file.readAsBytes(), allowMalformed: true);
+  }
+
+  static Future<String> _rewriteMarkdownImageReferences(
+    String rawMarkdown, {
+    required String sourceDir,
+    required Directory contentImageDir,
+  }) async {
+    final imageExp = RegExp(r'!\[([^\]]*)\]\(([^)]+)\)');
+    var imageIndex = 0;
+    final rewritten = StringBuffer();
+    var lastEnd = 0;
+
+    for (final match in imageExp.allMatches(rawMarkdown)) {
+      rewritten.write(rawMarkdown.substring(lastEnd, match.start));
+
+      final alt = match.group(1) ?? '';
+      final rawPath = _normalizeMarkdownImageTarget(match.group(2) ?? '');
+      final replacedPath = await _copyMarkdownImageToLocal(
+        rawPath,
+        sourceDir: sourceDir,
+        contentImageDir: contentImageDir,
+        imageIndex: imageIndex++,
+      );
+      if (replacedPath == null) {
+        if (_isRemoteImagePath(rawPath)) {
+          rewritten.write(_markdownImageSyntax(alt, rawPath));
+        } else {
+          rewritten.write(_markdownImageSyntax(alt, rawPath));
+        }
+      } else {
+        rewritten.write(_markdownImageSyntax(alt, replacedPath));
+      }
+      lastEnd = match.end;
+    }
+
+    rewritten.write(rawMarkdown.substring(lastEnd));
+    return _rewriteMarkdownHtmlImageTags(
+      rewritten.toString(),
+      sourceDir: sourceDir,
+      contentImageDir: contentImageDir,
+      startImageIndex: imageIndex,
+    );
+  }
+
+  static Future<String> _rewriteMarkdownHtmlImageTags(
+    String rawMarkdown, {
+    required String sourceDir,
+    required Directory contentImageDir,
+    required int startImageIndex,
+  }) async {
+    final imgExp = RegExp(r'<img\b[^>]*>', caseSensitive: false);
+    var imageIndex = startImageIndex;
+    final rewritten = StringBuffer();
+    var lastEnd = 0;
+
+    for (final match in imgExp.allMatches(rawMarkdown)) {
+      rewritten.write(rawMarkdown.substring(lastEnd, match.start));
+
+      final tag = match.group(0) ?? '';
+      final rawPath = _extractHtmlAttribute(tag, 'src');
+      final alt = _extractHtmlAttribute(tag, 'alt') ?? '';
+      if (rawPath == null || rawPath.trim().isEmpty) {
+        lastEnd = match.end;
+        continue;
+      }
+
+      final normalizedPath = _normalizeMarkdownImageTarget(rawPath);
+      final replacedPath = await _copyMarkdownImageToLocal(
+        normalizedPath,
+        sourceDir: sourceDir,
+        contentImageDir: contentImageDir,
+        imageIndex: imageIndex++,
+      );
+      if (replacedPath == null) {
+        if (_isRemoteImagePath(normalizedPath)) {
+          rewritten.write(_markdownImageSyntax(alt, normalizedPath));
+        } else {
+          rewritten.write(_markdownImageSyntax(alt, normalizedPath));
+        }
+      } else {
+        rewritten.write(_markdownImageSyntax(alt, replacedPath));
+      }
+      lastEnd = match.end;
+    }
+
+    rewritten.write(rawMarkdown.substring(lastEnd));
+    return _stripMarkdownHtmlLayoutTags(rewritten.toString());
+  }
+
+  static Future<String?> _copyMarkdownImageToLocal(
+    String rawPath, {
+    required String sourceDir,
+    required Directory contentImageDir,
+    required int imageIndex,
+  }) async {
+    if (rawPath.isEmpty || rawPath.startsWith('data:') || _isRemoteImagePath(rawPath)) {
+      return null;
+    }
+
+    final withoutFragment = rawPath.split('#').first.split('?').first;
+    final decodedPath = _safeUriDecode(withoutFragment);
+    final sourceImagePath = path.isAbsolute(decodedPath)
+        ? decodedPath
+        : path.normalize(path.join(sourceDir, decodedPath));
+    final sourceImage = File(sourceImagePath);
+    if (!await sourceImage.exists()) return null;
+
+    final extension = path.extension(sourceImagePath).isEmpty ? '.img' : path.extension(sourceImagePath);
+    final savedPath = path.join(contentImageDir.path, 'markdown_image_$imageIndex$extension');
+    await sourceImage.copy(savedPath);
+    return Uri.file(savedPath).toString();
+  }
+
+  static String _safeUriDecode(String value) {
+    try {
+      return Uri.decodeFull(value);
+    } catch (_) {
+      return value;
+    }
+  }
+
+  static bool _isRemoteImagePath(String value) => value.startsWith('http://') || value.startsWith('https://') || value.startsWith('//');
+
+  static String _markdownImageSyntax(String alt, String target) {
+    final escapedAlt = alt.replaceAll(']', r'\]');
+    final destination = target.contains(RegExp(r'\s')) ? '<$target>' : target;
+    return '![$escapedAlt]($destination)';
+  }
+
+  static String? _extractHtmlAttribute(String tag, String attrName) {
+    final attrExp = RegExp('$attrName\\s*=\\s*(["\\\'])(.*?)\\1', caseSensitive: false);
+    final quoted = attrExp.firstMatch(tag);
+    if (quoted != null) return quoted.group(2);
+
+    final unquotedExp = RegExp('$attrName\\s*=\\s*([^\\s>]+)', caseSensitive: false);
+    return unquotedExp.firstMatch(tag)?.group(1);
+  }
+
+  static String _stripMarkdownHtmlLayoutTags(String value) {
+    return value
+        .replaceAll(RegExp(r'<div\b[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'</div>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'<p\b[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n\n');
+  }
+
+  static String _normalizeMarkdownImageTarget(String value) {
+    var target = value.trim();
+    if ((target.startsWith('"') && target.endsWith('"')) || (target.startsWith("'") && target.endsWith("'"))) {
+      target = target.substring(1, target.length - 1).trim();
+    }
+    if (target.startsWith('//')) {
+      target = 'https:$target';
+    }
+    return target;
+  }
+
+  static Future<LocalImportResult> _importSingleChapterTextBook({
+    required String sourcePath,
+    required String sourceFileName,
+    required String aidPrefix,
+    required String status,
+    required String description,
+    required List<String> tags,
+    required String bodyHtml,
+  }) async {
+    final title = path.basenameWithoutExtension(sourcePath);
+    final aid = "$aidPrefix${DateTime.now().millisecondsSinceEpoch}";
+
+    final appDir = await getApplicationSupportDirectory();
+    final importedBookDir = Directory(path.join(appDir.path, 'imported_books', aid));
+    final chapterCacheDir = Directory(path.join(appDir.path, 'cached_chapter'));
+    await importedBookDir.create(recursive: true);
+    await chapterCacheDir.create(recursive: true);
+    await File(sourcePath).copy(path.join(importedBookDir.path, sourceFileName));
+
+    final cid = "${aid}_chapter_0";
+    await File(path.join(chapterCacheDir.path, "${aid}_$cid.txt")).writeAsString('<div id="content">$bodyHtml</div>');
+
+    final detail = NovelDetail(
+      title,
+      "Local Import",
+      status,
+      DateTime.now().toIso8601String().split('T').first,
+      "",
+      description,
+      tags,
+      [],
+      "Imported",
+      "Local Reading",
+      false,
+    )..catalogue = [
+        CatVolume(
+          title: "Content",
+          chapters: [CatChapter(title: title, cid: cid)],
+        )
+      ];
+
+    await DBService.instance.upsertNovelDetail(NovelDetailEntityData(aid: aid, json: jsonEncode(detail.toJson())));
+    await DBService.instance.upsertBookshelf(
+      BookshelfEntityData(
+        aid: aid,
+        bid: aid,
+        url: "$localUrlPrefix$aid",
+        title: title,
+        img: "",
+        classId: "0",
+      ),
+    );
+
+    return LocalImportResult(aid: aid, title: title);
+  }
+
+  static String _plainTextToHtml(String text) {
+    final normalized = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim();
+    if (normalized.isEmpty) return '';
+    final paragraphs = normalized.split(RegExp(r'\n\s*\n+'));
+    return paragraphs
+        .map((paragraph) {
+          final escaped = htmlEscape.convert(paragraph.trim());
+          return '<p>${escaped.replaceAll('\n', '<br>')}</p>';
+        })
+        .join('\n');
+  }
+
+  static String _plainTextPreservingLineBreaksToHtml(String text) {
+    return htmlEscape.convert(text.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim());
   }
 
   static String? _readMetadataText(XmlElement? metadata, Set<String> candidateNames) {

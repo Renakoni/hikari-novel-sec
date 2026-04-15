@@ -26,6 +26,7 @@ import '../../models/page_state.dart';
 import '../../network/api.dart';
 import '../../service/db_service.dart';
 import '../../service/local_storage_service.dart';
+import '../../service/local_book_service.dart';
 import 'widgets/paper_curl_pager.dart';
 
 class ReaderController extends GetxController {
@@ -84,6 +85,8 @@ class ReaderController extends GetxController {
 
   RxList<String> images = RxList();
 
+  RxString markdownText = "".obs;
+
   String errorMsg = "";
 
   RxBool isFontFileAvailable = false.obs;
@@ -121,6 +124,7 @@ class ReaderController extends GetxController {
     //TODO 还需要优化
     debounce(currentLocation, (_) => setReadHistory(), time: const Duration(milliseconds: 150));
     debounce(currentIndex, (_) => setReadHistory(), time: const Duration(milliseconds: 150));
+    TtsService.instance.onChapterCompleted = _continueTtsToNextChapter;
   }
 
   @override
@@ -148,6 +152,7 @@ class ReaderController extends GetxController {
 
   @override
   void onClose() {
+    TtsService.instance.onChapterCompleted = null;
     TtsService.instance.stop();
     if (readerSettingsState.value.wakeLock) WakelockPlus.toggle(enable: false);
     _applyReaderSystemUi(false);
@@ -185,8 +190,21 @@ class ReaderController extends GetxController {
     pageState.value = PageState.loading;
 
     chapterTitle.value = "";
+    if (LocalBookService.isMarkdownAid(aid)) {
+      await _getMarkdownContent();
+      return;
+    }
+    if (LocalBookService.isTxtAid(aid)) {
+      await _getTxtContent();
+      return;
+    }
+
     final chapter = await _getChapterContentFromLocal();
-    chapter == null ? _getContentByNetwork() : _getContentByLocal(chapter);
+    if (chapter == null) {
+      await _getContentByNetwork();
+    } else {
+      await _getContentByLocal(chapter);
+    }
   }
 
   Future<String?> _getChapterContentFromLocal() async {
@@ -256,25 +274,82 @@ class ReaderController extends GetxController {
         : pageController.jumpToPage(page);
   }
 
-  void nextChapter() {
-    if (currentVolumeIndex + 1 == currentVolumeTotal && currentChapterIndex + 1 == currentChapterTotal) {
-      Get.dialog(
-        AlertDialog(
-          icon: Icon(Icons.warning_amber),
-          title: Text("warning".tr),
-          content: Text("no_next_chapter".tr),
-          actions: [TextButton(onPressed: () => Get.back(), child: Text("confirm".tr))],
-        ),
-      );
-    } else {
-      if (currentVolumeIndex + 1 != currentVolumeTotal && currentChapterIndex + 1 == currentChapterTotal) {
-        currentVolumeIndex++;
-        currentChapterIndex = 0;
-      } else {
-        currentChapterIndex++;
-      }
+  bool get hasNextChapter => !(currentVolumeIndex + 1 == currentVolumeTotal && currentChapterIndex + 1 == currentChapterTotal);
 
-      getContent();
+  Future<bool> nextChapter({bool showEndDialog = true}) async {
+    if (!hasNextChapter) {
+      if (showEndDialog) {
+        Get.dialog(
+          AlertDialog(
+            icon: Icon(Icons.warning_amber),
+            title: Text("warning".tr),
+            content: Text("no_next_chapter".tr),
+            actions: [TextButton(onPressed: () => Get.back(), child: Text("confirm".tr))],
+          ),
+        );
+      }
+      return false;
+    }
+
+    if (currentVolumeIndex + 1 != currentVolumeTotal && currentChapterIndex + 1 == currentChapterTotal) {
+      currentVolumeIndex++;
+      currentChapterIndex = 0;
+    } else {
+      currentChapterIndex++;
+    }
+
+    await getContent();
+    return pageState.value == PageState.success;
+  }
+
+  Future<void> _getMarkdownContent() async {
+    try {
+      final raw = await LocalBookService.loadMarkdownSource(aid);
+      if (raw.trim().isEmpty) {
+        errorMsg = "本地 Markdown 文件不存在或为空";
+        pageState.value = PageState.error;
+        return;
+      }
+      chapterTitle.value = catalogue[currentVolumeIndex].chapters[currentChapterIndex].title;
+      markdownText.value = raw;
+      text.value = raw;
+      images.clear();
+      pageState.value = PageState.success;
+    } catch (e) {
+      errorMsg = e.toString();
+      pageState.value = PageState.error;
+    }
+  }
+
+  Future<void> _getTxtContent() async {
+    try {
+      final raw = await LocalBookService.loadTxtSource(aid);
+      if (raw.trim().isEmpty) {
+        errorMsg = "本地 TXT 文件不存在或为空";
+        pageState.value = PageState.error;
+        return;
+      }
+      chapterTitle.value = catalogue[currentVolumeIndex].chapters[currentChapterIndex].title;
+      markdownText.value = "";
+      text.value = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim();
+      images.clear();
+      pageState.value = PageState.success;
+    } catch (e) {
+      errorMsg = e.toString();
+      pageState.value = PageState.error;
+    }
+  }
+
+  Future<void> _continueTtsToNextChapter() async {
+    final tts = TtsService.instance;
+    if (!tts.enabled.value || !tts.autoPlayNextChapter.value) return;
+
+    final loaded = await nextChapter(showEndDialog: false);
+    if (!loaded) return;
+
+    final chapterText = text.value;
+    if (chapterText.trim().isNotEmpty) {
+      await tts.startChapter(chapterText, title: chapterTitle.value);
     }
   }
 

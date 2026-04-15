@@ -394,6 +394,7 @@ class _HorizontalReadPageState extends State<HorizontalReadPage> with WidgetsBin
   Widget _buildImage(int imageIndex) {
     final imageUrl = (pages[imageIndex] as ImagePage).url;
     final isLocalFile = !imageUrl.startsWith('http') && File(imageUrl).existsSync();
+    final isRemoteFile = imageUrl.startsWith('http');
     return Center(
       child: GestureDetector(
         onDoubleTap: () => widget.onViewImage(imageIndex),
@@ -404,13 +405,15 @@ class _HorizontalReadPageState extends State<HorizontalReadPage> with WidgetsBin
                 fit: BoxFit.contain,
                 errorBuilder: (context, _, __) => const Center(child: Column(children: [Icon(Icons.error_outline)])),
               )
-            : CachedNetworkImage(
-                imageUrl: imageUrl,
-                httpHeaders: Request.userAgent,
-                fit: BoxFit.contain,
-                progressIndicatorBuilder: (context, url, downloadProgress) => Center(child: CircularProgressIndicator(value: downloadProgress.progress)),
-                errorWidget: (context, url, error) => Center(child: Column(children: [Icon(Icons.error_outline), Text(error.toString())])),
-              ),
+            : isRemoteFile
+                ? CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    httpHeaders: Request.userAgent,
+                    fit: BoxFit.contain,
+                    progressIndicatorBuilder: (context, url, downloadProgress) => Center(child: CircularProgressIndicator(value: downloadProgress.progress)),
+                    errorWidget: (context, url, error) => Center(child: Column(children: [Icon(Icons.error_outline), Text(error.toString())])),
+                  )
+                : const Center(child: Icon(Icons.broken_image_outlined)),
       ),
     );
   }

@@ -4,11 +4,15 @@ import 'package:get/get.dart';
 import 'package:hikari_novel_flutter/common/log.dart';
 import 'package:hikari_novel_flutter/models/reader_direction.dart';
 import 'package:hikari_novel_flutter/pages/reader/controller.dart';
+import 'package:hikari_novel_flutter/pages/reader/widgets/ai_chapter_analysis_page.dart';
+import 'package:hikari_novel_flutter/pages/reader/widgets/ai_book_memory_page.dart';
 import 'package:hikari_novel_flutter/pages/reader/widgets/custom_header.dart';
 import 'package:hikari_novel_flutter/pages/reader/widgets/custom_slider.dart';
 import 'package:hikari_novel_flutter/pages/reader/widgets/horizontal_read_page.dart';
+import 'package:hikari_novel_flutter/pages/reader/widgets/markdown_read_page.dart';
 import 'package:hikari_novel_flutter/pages/reader/widgets/reader_background.dart';
 import 'package:hikari_novel_flutter/pages/reader/widgets/vertical_read_page.dart';
+import 'package:hikari_novel_flutter/service/ai/ai_analysis_service.dart';
 import 'package:hikari_novel_flutter/widgets/state_page.dart';
 import 'package:intl/intl.dart';
 import 'package:hikari_novel_flutter/service/tts_service.dart';
@@ -17,6 +21,7 @@ import 'package:hikari_novel_flutter/pages/reader/widgets/tts_floating_controlle
 import '../../common/constants.dart';
 import '../../models/page_state.dart';
 import '../../router/route_path.dart';
+import '../../service/local_book_service.dart';
 
 class ReaderPage extends StatelessWidget {
   ReaderPage({super.key});
@@ -51,8 +56,123 @@ class ReaderPage extends StatelessWidget {
     return settings.showStatusBar && settings.direction != ReaderDirection.upToDown;
   }
 
+  Future<void> _analyzeCurrentChapter(BuildContext context) async {
+    final ai = AiAnalysisService.instance;
+    try {
+      if (!ai.config.isReady) {
+        showSnackBar(message: "\u8bf7\u5148\u5728\u8bbe\u7f6e -> AI \u4e2d\u5b8c\u6210\u914d\u7f6e", context: context);
+        return;
+      }
+
+      final text = controller.text.value;
+      if (text.trim().isEmpty) {
+        showSnackBar(message: "\u5f53\u524d\u7ae0\u8282\u8fd8\u5728\u52a0\u8f7d\u4e2d", context: context);
+        return;
+      }
+
+      showSnackBar(
+        message: "\u6b63\u5728\u5206\u6790\u5f53\u524d\u7ae0\u8282...",
+        context: context,
+        duration: const Duration(days: 1),
+      );
+      final result = await ai.analyzeChapter(
+        aid: controller.aid,
+        cid: controller.cid,
+        chapterTitle: controller.chapterTitle.value,
+        chapterText: text,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      await Get.to(() => AiChapterAnalysisPage(result: result));
+    } catch (e) {
+      if (!context.mounted) return;
+      showSnackBar(message: "AI \u5206\u6790\u5931\u8d25: $e", context: context);
+    }
+  }
+
+  Future<void> _viewCurrentAnalysis(BuildContext context) async {
+    final ai = AiAnalysisService.instance;
+    final cached = await ai.loadAnalysis(aid: controller.aid, cid: controller.cid);
+    if (cached == null) {
+      showSnackBar(message: "\u5f53\u524d\u7ae0\u8282\u8fd8\u6ca1\u6709\u5206\u6790\u7ed3\u679c", context: context);
+      return;
+    }
+    await Get.to(() => AiChapterAnalysisPage(result: cached));
+  }
+
+  Future<void> _showAiActionSheet(BuildContext context) async {
+    final ai = AiAnalysisService.instance;
+    final hasResult = await ai.loadAnalysis(aid: controller.aid, cid: controller.cid) != null;
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final colorScheme = Theme.of(sheetContext).colorScheme;
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetContext).size.height * 0.72),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: Icon(
+                        hasResult ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        color: hasResult ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                      ),
+                      title: const Text('\u67e5\u770b\u672c\u7ae0\u5206\u6790'),
+                      subtitle: Text(
+                        hasResult
+                            ? '\u6253\u5f00\u5f53\u524d\u7ae0\u8282\u7684\u5206\u6790\u7ed3\u679c'
+                            : '\u8bf7\u5148\u5206\u6790\u5f53\u524d\u7ae0\u8282',
+                      ),
+                      enabled: hasResult,
+                      onTap: hasResult
+                          ? () async {
+                              Navigator.of(sheetContext).pop();
+                              await _viewCurrentAnalysis(context);
+                            }
+                          : null,
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.auto_awesome_outlined),
+                      title: const Text('\u5206\u6790\u5f53\u524d\u7ae0\u8282'),
+                      subtitle: Text(
+                        hasResult
+                            ? '\u5df2\u6709\u7ed3\u679c\uff0c\u518d\u6b21\u5206\u6790\u4f1a\u8986\u76d6\u65e7\u7ed3\u679c'
+                            : '\u751f\u6210\u5f53\u524d\u7ae0\u8282\u7684\u65b0\u5206\u6790',
+                      ),
+                      onTap: () async {
+                        Navigator.of(sheetContext).pop();
+                        await _analyzeCurrentChapter(context);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.inventory_2_outlined),
+                      title: const Text('\u67e5\u770b\u672c\u4e66 AI \u8bb0\u5fc6'),
+                      subtitle: const Text('\u67e5\u770b\u7eaa\u8981\u3001\u5927\u7eb2\u3001\u4eba\u7269\u72b6\u6001\u548c\u5173\u7cfb\u72b6\u6001'),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        Get.to(() => AiBookMemoryPage(aid: controller.aid));
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final supportsAi = LocalBookService.supportsAiAnalysis(controller.aid);
     return Scaffold(
       body: Stack(
         children: [
@@ -82,18 +202,35 @@ class ReaderPage extends StatelessWidget {
           _buildBottomStatusBar(context),
           const TtsFloatingController(),
           Obx(() {
-            //顶栏
+            //濠碉紕鍋戦崐娑㈠春閺嶎厽鍋?
             double statusBarHeight = MediaQuery.of(context).padding.top;
             return AnimatedPositioned(
               top: controller.showBar.value ? 0 : -(kToolbarHeight + statusBarHeight),
               left: 0,
               right: 0,
               duration: Duration(milliseconds: 100),
-              child: AppBar(backgroundColor: Theme.of(context).colorScheme.secondaryContainer, title: Text(controller.chapterTitle.value), titleSpacing: 0),
+              child: AppBar(
+                backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                titleSpacing: 0,
+                title: Text(
+                  controller.chapterTitle.value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                actions: supportsAi
+                    ? [
+                        IconButton(
+                          tooltip: "AI \u7ae0\u8282\u5206\u6790",
+                          onPressed: () => _showAiActionSheet(context),
+                          icon: const Icon(Icons.auto_awesome_outlined),
+                        ),
+                      ]
+                    : null,
+              ),
             );
           }),
           Obx(() {
-            //底栏
+            //闂佸湱鍘ч悺銊ッ哄鈧幃?
             double navigationBarHeight = MediaQuery.of(context).padding.bottom;
             int bottomBarHeight = 100;
             return AnimatedPositioned(
@@ -136,8 +273,7 @@ class ReaderPage extends StatelessWidget {
                                     onPressed: () async {
                                       final tts = TtsService.instance;
                                       final text = controller.text.value;
-                                      final cleaned = text.replaceAll(RegExp(r'\s+'), ' ').trim();
-                                      if (cleaned.isEmpty) {
+                                      if (text.trim().isEmpty) {
                                         showSnackBar(message: "chapter_content_loading_tip".tr, context: context);
                                         return;
                                       }
@@ -151,7 +287,7 @@ class ReaderPage extends StatelessWidget {
                                         return;
                                       }
 
-                                      await tts.startChapter(cleaned);
+                                      await tts.startChapter(text);
                                     },
                                     icon: Obx(() {
                                       final tts = TtsService.instance;
@@ -191,6 +327,13 @@ class ReaderPage extends StatelessWidget {
   Widget _buildReadPage(BuildContext context) {
     return Obx(() {
       if (controller.pageState.value == PageState.success) {
+        if (LocalBookService.isMarkdownAid(controller.aid)) {
+          return MarkdownReadPage(
+            data: controller.markdownText.value,
+            padding: _contentPadding(context, inPageStatusBar: false),
+            textColor: controller.currentTextColor.value ?? Theme.of(context).colorScheme.onSurface,
+          );
+        }
         return controller.readerSettingsState.value.direction == ReaderDirection.upToDown ? _buildVertical(context) : _buildHorizontal(context);
       } else {
         return Container();
@@ -281,12 +424,12 @@ class ReaderPage extends StatelessWidget {
         controller.currentIndex.value = index;
         controller.maxPage.value = max;
         if (max == 1 && index == 0) {
-          //仅一页的情况下
+          //濠电偛顕慨鎾箠瀹ュ洨鍗氶悗娑櫱滄禍婊堟煟閵忕姷浠涢柣锝変憾閺岀喖顢涘顓炴闂佸摜濮撮張顒傜矙?
           controller.horizontalProgress.value = 100;
-          controller.setReadHistory(); //立即更新历史阅读记录
+          controller.setReadHistory(); //缂傚倷鐒﹂弻銊╊敄閸涱厾鏆ら柛鈩冪☉閸楁娊鎮楀☉娅虫垿鎮￠埀顒勬⒑閸涘⊕顏勎涘Δ鍕╀汗闁割偅娲橀埛鎾绘煕濞戙垹浜伴柛銈冨灲閹鎷呯憴鍕嚒缂?
         } else if (max > 0) {
           controller.horizontalProgress.value = int.parse(((index + 1) / max * 100.0).toStringAsFixed(0)).clamp(0, 100);
-          //由controller的debounce监听currentIndex变化，判断是否更新历史阅读记录
+          //闂備焦鐪归崹璇层€掔粵绯縯roller闂備焦鐪归崝宀勫垂缁⒔ounce闂備胶鍎甸弲婊堝垂閻㈢绠氬┑澶涚rrentIndex闂備礁鎲￠悷锕傛晪闁诲骸鐏氶悡锟犲极瀹ュ洣娌柦妯侯槺娴煎牓姊洪崫鍕簽闁告妫勫嵄闁归棿绀佺憴锕傛煥閺冨洤袚缂佺虎鍨堕弻锟犲磼濞戞瑧鍑￠悗鍦焾椤嘲鐣烽敐澶婅摕闁靛瀵屽鎰版煟閻樺弶澶勬俊鍙夊浮椤㈡瑩宕堕鍌欐睏?
         }
       },
       onViewImage: (index) => Get.toNamed(RoutePath.photo, arguments: {"gallery_mode": true, "list": controller.images, "index": index}),

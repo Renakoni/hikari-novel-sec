@@ -22,13 +22,53 @@ class MyPage extends StatelessWidget {
             _buildUserInfoCard(context),
             const SizedBox(height: 20),
             ListTile(title: Text("browsing_history".tr), leading: const Icon(Icons.history), onTap: AppSubRouter.toBrowsingHistory),
-            ListTile(title: const Text("导入 EPUB"), leading: const Icon(Icons.upload_file_outlined), onTap: controller.importEpub),
+            ListTile(title: const Text("导入电子书"), leading: const Icon(Icons.upload_file_outlined), onTap: () => _showImportBookSheet(context)),
             ListTile(title: Text("setting".tr), leading: const Icon(Icons.settings_outlined), onTap: AppSubRouter.toSetting),
             ListTile(title: Text("about".tr), leading: const Icon(Icons.info_outline), onTap: AppSubRouter.toAbout),
             ListTile(title: Text("logout".tr), leading: const Icon(Icons.logout), onTap: controller.logout),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _showImportBookSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.menu_book_outlined),
+                title: const Text("EPUB"),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  controller.importEpub();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.article_outlined),
+                title: const Text("Markdown"),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  controller.importMarkdown();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.notes_outlined),
+                title: const Text("TXT"),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  controller.importTxt();
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

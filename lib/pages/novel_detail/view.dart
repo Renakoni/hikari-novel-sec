@@ -198,11 +198,14 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
               controller.deleteCache();
             } else if (value == _MenuItem.delAllReadHistory) {
               controller.deleteAllReadHistory();
+            } else if (value == _MenuItem.clearAiCache) {
+              controller.clearAiAnalysisCache();
             }
           },
           itemBuilder: (context) => [
             if (!controller.isLocalBook) PopupMenuItem(value: _MenuItem.cacheQueue, child: Text("view_cache_queue".tr)),
             if (!controller.isLocalBook) PopupMenuItem(value: _MenuItem.deleteCache, child: Text("delete_cache".tr)),
+            PopupMenuItem(value: _MenuItem.clearAiCache, child: const Text("清除 AI 缓存")),
             PopupMenuItem(value: _MenuItem.delAllReadHistory, child: Text("del_all_read_history".tr)),
           ],
         ),
@@ -614,4 +617,4 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
   }
 }
 
-enum _MenuItem { deleteCache, cacheQueue, delAllReadHistory }
+enum _MenuItem { deleteCache, cacheQueue, clearAiCache, delAllReadHistory }

@@ -16,6 +16,7 @@ import 'package:hikari_novel_flutter/router/app_pages.dart';
 import 'package:hikari_novel_flutter/router/route_path.dart';
 import 'package:hikari_novel_flutter/service/db_service.dart';
 import 'package:hikari_novel_flutter/service/dev_mode_service.dart';
+import 'package:hikari_novel_flutter/service/ai/ai_analysis_service.dart';
 import 'package:hikari_novel_flutter/service/local_storage_service.dart';
 import 'package:hikari_novel_flutter/service/tts_service.dart';
 import 'package:jiffy/jiffy.dart';
@@ -30,6 +31,7 @@ void main() async {
   await Get.put(LocalStorageService()).init();
   Get.put(DevModeService()).init();
   Get.put(DBService()).init();
+  Get.put(AiAnalysisService()).init();
   await Get.put(TtsService()).init();
 
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
@@ -123,7 +125,7 @@ class BuildMainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final SnackBarThemeData snackBarTheme = SnackBarThemeData(
-      behavior: SnackBarBehavior.floating,
+      behavior: SnackBarBehavior.fixed,
       actionTextColor: lightColorScheme.primary,
       backgroundColor: lightColorScheme.onSurface,
       closeIconColor: lightColorScheme.surface,

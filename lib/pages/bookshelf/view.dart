@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hikari_novel_flutter/pages/bookshelf/controller.dart';
+import 'package:hikari_novel_flutter/pages/bookshelf/widgets/ai_bookshelf_view.dart';
 import 'package:hikari_novel_flutter/pages/bookshelf/widgets/bookshelf_content_view.dart';
 import 'package:hikari_novel_flutter/pages/bookshelf/widgets/bookshelf_search_view.dart';
 
@@ -85,12 +86,12 @@ class BookshelfPage extends StatelessWidget {
       actions: [
         Obx(
           () => IconButton(
-            onPressed: () => _showTagFilter(context),
+            onPressed: () => controller.pageState.value = PageState.bookshelfSearch,
             icon: Icon(
-              Icons.swap_vert,
+              Icons.manage_search,
               color: controller.selectedTags.isEmpty ? null : Theme.of(context).colorScheme.primary,
             ),
-            tooltip: controller.selectedTags.isEmpty ? "Tag Filter" : "Tags: ${controller.selectedTags.join(", ")}",
+            tooltip: controller.selectedTags.isEmpty ? "搜索与筛选" : "筛选中: ${controller.selectedTags.join(", ")}",
           ),
         ),
         IconButton(
@@ -101,60 +102,12 @@ class BookshelfPage extends StatelessWidget {
           },
           icon: const Icon(Icons.sync),
         ),
-        IconButton(onPressed: () => controller.pageState.value = PageState.bookshelfSearch, icon: const Icon(Icons.search)),
+        IconButton(
+          onPressed: () => Get.to(() => const AiBookshelfPage()),
+          icon: const Icon(Icons.auto_awesome_outlined),
+          tooltip: "AI 记忆书架",
+        ),
       ],
-    );
-  }
-
-  Future<void> _showTagFilter(BuildContext context) async {
-    final tags = await controller.getAvailableTagsForClass(currentTabController.classId);
-    if (!context.mounted) return;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            child: Obx(
-              () => Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Tag Filter", style: Theme.of(sheetContext).textTheme.titleMedium),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text("All"),
-                        selected: controller.selectedTags.isEmpty,
-                        onSelected: (_) => controller.clearTagFilters(),
-                      ),
-                      ...tags.map(
-                        (tag) => ChoiceChip(
-                          label: Text(tag),
-                          selected: controller.selectedTags.contains(tag),
-                          onSelected: (_) => controller.toggleTagFilter(tag),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (tags.isEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      "No cached tags available yet. Open a book detail page first, or import a local EPUB.",
-                      style: Theme.of(sheetContext).textTheme.bodySmall,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 

@@ -30,6 +30,7 @@ class TtsService extends GetxService {
   final rate = 0.5.obs;
   final pitch = 1.0.obs;
   final volume = 1.0.obs;
+  final autoPlayNextChapter = true.obs;
 
   final engines = <String>[].obs;
   final voices = <Map<String, String>>[].obs;
@@ -89,6 +90,7 @@ class TtsService extends GetxService {
   StreamSubscription<TtsProviderEvent>? _providerSub;
   bool _initialized = false;
   bool _pauseRequested = false;
+  Future<void> Function()? onChapterCompleted;
 
   bool get isSystemProvider => providerType.value == TtsProviderType.system;
 
@@ -109,6 +111,7 @@ class TtsService extends GetxService {
     rate.value = LocalStorageService.instance.getReaderTtsRate();
     pitch.value = LocalStorageService.instance.getReaderTtsPitch();
     volume.value = LocalStorageService.instance.getReaderTtsVolume();
+    autoPlayNextChapter.value = LocalStorageService.instance.getReaderTtsAutoPlayNextChapter();
 
     volcengineAppId.value = LocalStorageService.instance.getReaderTtsVolcengineAppId();
     volcengineAccessKey.value = LocalStorageService.instance.getReaderTtsVolcengineAccessKey();
@@ -172,6 +175,11 @@ class TtsService extends GetxService {
     providerType.value = type;
     LocalStorageService.instance.setReaderTtsProvider(type.storageValue);
     await _bindProvider(type, reinitialize: true);
+  }
+
+  void setAutoPlayNextChapter(bool value) {
+    autoPlayNextChapter.value = value;
+    LocalStorageService.instance.setReaderTtsAutoPlayNextChapter(value);
   }
 
   Future<void> refreshEngines() async {
@@ -546,6 +554,10 @@ class TtsService extends GetxService {
         _chunkIndex += 1;
         if (_chunkIndex >= _chunks.length) {
           _endSession();
+          final callback = onChapterCompleted;
+          if (autoPlayNextChapter.value && callback != null) {
+            unawaited(callback());
+          }
           return;
         }
         _speakCurrentChunk();
@@ -577,13 +589,56 @@ class TtsService extends GetxService {
   int get _currentMaxChunkLen => isGoogleProvider ? _googleMaxChunkLen : _defaultMaxChunkLen;
 
   String _sanitizeTextForTts(String text) {
-    return text
+    final cleaned = text
         .replaceAllMapped(RegExp(r'⟪([^⧸⟫\s]+)⧸[^⟫\s。，！？；、,]*⟫'), (match) => match.group(1) ?? '')
         .replaceAllMapped(RegExp(r'⟪([^⧸⟫\s]+)⧸[A-Za-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüńňǹḿ]+'), (match) => match.group(1) ?? '')
-        .replaceAll(RegExp(r'[⟪⟫⧸]'), '')
-        .replaceAll(RegExp(r'\s+'), ' ')
+        .replaceAll(RegExp(r'[⟪⟫⧸]'), '');
+    return _applyPausePunctuationForTts(cleaned)
+        .replaceAll(RegExp(r'[、,]+'), '，')
+        .replaceAll(RegExp(r'，+'), '，')
+        .replaceAll(RegExp(r'。+'), '。')
         .trim();
   }
+
+  String _applyPausePunctuationForTts(String text) {
+    final normalized = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final buffer = StringBuffer();
+    var pendingComma = false;
+    var pendingPeriod = false;
+    var lastWritten = '';
+
+    for (final rune in normalized.runes) {
+      final char = String.fromCharCode(rune);
+      if (char == '\n') {
+        pendingPeriod = true;
+        pendingComma = false;
+        continue;
+      }
+      if (char == ' ' || char == '\t' || char == '\u00A0' || char == '\u3000') {
+        pendingComma = !pendingPeriod;
+        continue;
+      }
+
+      if (lastWritten.isNotEmpty && !_isPausePunctuation(lastWritten) && !_isPausePunctuation(char)) {
+        if (pendingPeriod) {
+          buffer.write('。');
+          lastWritten = '。';
+        } else if (pendingComma) {
+          buffer.write('，');
+          lastWritten = '，';
+        }
+      }
+
+      buffer.write(char);
+      lastWritten = char;
+      pendingComma = false;
+      pendingPeriod = false;
+    }
+
+    return buffer.toString();
+  }
+
+  bool _isPausePunctuation(String char) => '。！？；，、,.!?;:：'.contains(char);
 
   List<String> _splitToChunks(String text, {required int maxChunkLen, int? maxSentenceLen}) {
     final normalized = text.replaceAll('\r\n', '\n').trim();

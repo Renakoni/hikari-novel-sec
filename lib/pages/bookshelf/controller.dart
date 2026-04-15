@@ -79,9 +79,18 @@ class BookshelfController extends GetxController with GetTickerProviderStateMixi
   Future<List<String>> getAvailableTagsForClass(String classId) async {
     final entries = await DBService.instance.getAllBookshelf();
     final classEntries = entries.where((item) => item.classId == classId);
+    return _collectAvailableTags(classEntries);
+  }
+
+  Future<List<String>> getAvailableTags() async {
+    final entries = await DBService.instance.getAllBookshelf();
+    return _collectAvailableTags(entries);
+  }
+
+  Future<List<String>> _collectAvailableTags(Iterable<BookshelfEntityData> entries) async {
     final tags = <String>{};
 
-    for (final entry in classEntries) {
+    for (final entry in entries) {
       final detail = await DBService.instance.getNovelDetail(entry.aid);
       if (detail == null) continue;
       try {
@@ -236,7 +245,7 @@ class BookshelfContentController extends GetxController {
                 children: [
                   ListTile(
                     title: Text(item.title),
-                    subtitle: const Text("本地 EPUB，Local 标签不可删除"),
+                    subtitle: Text(_localBookSubtitle(item.aid)),
                   ),
                   ListTile(
                     leading: const Icon(Icons.remove_circle_outline),
@@ -255,12 +264,12 @@ class BookshelfContentController extends GetxController {
                   ListTile(
                     leading: Icon(Icons.delete_forever_outlined, color: Theme.of(sheetContext).colorScheme.error),
                     title: Text("删除导入记录和缓存文件", style: TextStyle(color: Theme.of(sheetContext).colorScheme.error)),
-                    subtitle: const Text("会一并删除封面、章节缓存和导入副本"),
+                    subtitle: const Text("会一并删除图片、章节缓存和导入副本"),
                     onTap: () async {
                       Navigator.of(sheetContext).pop();
                       await _confirmLocalAction(
                         title: "彻底删除本地书",
-                        message: "这会删除导入记录、书架项、阅读历史，以及应用内部保存的封面、章节缓存和 EPUB 副本。此操作不可逆。",
+                        message: "这会删除导入记录、书架项、阅读历史，以及应用内部保存的图片、章节缓存和导入副本。此操作不可逆。",
                         action: () => LocalBookService.deleteImportedRecordAndFiles(item.aid),
                         successMessage: "已彻底删除本地书",
                       );
@@ -273,6 +282,12 @@ class BookshelfContentController extends GetxController {
         );
       },
     );
+  }
+
+  String _localBookSubtitle(String aid) {
+    if (LocalBookService.isMarkdownAid(aid)) return "本地 Markdown，Local 标签不可删除";
+    if (LocalBookService.isTxtAid(aid)) return "本地 TXT，Local 标签不可删除";
+    return "本地 EPUB，Local 标签不可删除";
   }
 
   Future<void> _confirmLocalAction({
@@ -336,18 +351,54 @@ class BookshelfSearchController extends GetxController {
 
   RxList<BookshelfNovelInfo> data = RxList();
   Rx<PageState> pageState = Rx(PageState.placeholder);
+  RxList<String> availableTags = <String>[].obs;
 
-  void getBookshelfByKeyword() async {
-    data.assignAll(
-      (await DBService.instance.getBookshelfByKeyword(
-        searchTextEditController.text,
-      )).map((e) => BookshelfNovelInfo(bid: e.bid, aid: e.aid, url: e.url, title: e.title, img: e.img)),
-    );
-    if (data.isEmpty) {
-      pageState.value = PageState.empty;
-    } else {
-      pageState.value = PageState.success;
+  @override
+  void onInit() {
+    super.onInit();
+    refreshAvailableTags();
+    refreshResults();
+    ever<Set<String>>(_bookshelfController.selectedTags, (_) {
+      refreshResults();
+    });
+  }
+
+  Future<void> refreshAvailableTags() async {
+    availableTags.assignAll(await _bookshelfController.getAvailableTags());
+  }
+
+  Future<void> refreshResults() async {
+    final keyword = searchTextEditController.text.trim();
+    final selectedTags = _bookshelfController.selectedTags.toSet();
+
+    if (keyword.isEmpty && selectedTags.isEmpty) {
+      data.clear();
+      pageState.value = PageState.placeholder;
+      return;
     }
+
+    final source = keyword.isEmpty
+        ? await DBService.instance.getAllBookshelf()
+        : await DBService.instance.getBookshelfByKeyword(keyword);
+    final matched = <BookshelfNovelInfo>[];
+
+    for (final item in source) {
+      if (selectedTags.isNotEmpty) {
+        final detail = await DBService.instance.getNovelDetail(item.aid);
+        if (detail == null) continue;
+        try {
+          final novelDetail = NovelDetail.fromString(detail.json);
+          final tags = {...novelDetail.tags, ...novelDetail.personalTags};
+          if (tags.intersection(selectedTags).isEmpty) continue;
+        } catch (_) {
+          continue;
+        }
+      }
+      matched.add(BookshelfNovelInfo(bid: item.bid, aid: item.aid, url: item.url, title: item.title, img: item.img));
+    }
+
+    data.assignAll(matched);
+    pageState.value = data.isEmpty ? PageState.empty : PageState.success;
   }
 
   void back() => _bookshelfController.pageState.value = PageState.bookshelfContent;
